@@ -104,8 +104,7 @@ public class GameStatePickUpgrade : GameState
             }
             else
             {
-                
-                Debug.LogError($"Checkout failed: {response.StatusCode}");
+                throw new Exception("Failed to update the upgrade");
             }
         }
         catch (Exception ex)

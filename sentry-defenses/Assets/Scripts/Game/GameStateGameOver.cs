@@ -49,7 +49,7 @@ namespace Game
         
         private IEnumerator ContinuePlaying()
         {
-            yield return new WaitForSeconds(Random.value);
+            yield return new WaitForSeconds(1 + Random.value);
             OnFight();
         }
 
