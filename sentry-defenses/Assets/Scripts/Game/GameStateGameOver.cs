@@ -34,8 +34,7 @@ namespace Game
         public override void OnEnter()
         {
             base.OnEnter();
-
-            _eventManager.Reset();
+            
             _gameOverMenu.SetBugCount(_gameData.BugCount);
             _gameOverMenu.Show(() =>
             {
@@ -44,6 +43,8 @@ namespace Game
                     _stateMachine.StartCoroutine(ContinuePlaying());
                 }    
             });
+            
+            _eventManager.Reset();
         }
         
         private IEnumerator ContinuePlaying()
