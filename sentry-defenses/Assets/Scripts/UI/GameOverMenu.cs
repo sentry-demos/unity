@@ -53,9 +53,7 @@ public class GameOverMenu : MonoBehaviour
         _youSentryd.DOFade(1, _fadeDuration);
         _restartButton.image.DOFade(1, _fadeDuration);
         _background.DOFade(1, _fadeDuration);
-        _logoImage.DOFade(1, _fadeDuration);
-        
-        finishCallback?.Invoke();
+        _logoImage.DOFade(1, _fadeDuration).OnComplete(() => finishCallback?.Invoke());
     }
 
     public void Hide(Action finishCallback)

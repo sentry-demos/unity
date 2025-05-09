@@ -36,10 +36,10 @@ public class PickUpgradeMenu : MonoBehaviour
         button.GetComponent<Button>().onClick.AddListener(() => clickedCallback.Invoke(upgradeType));
     }
     
-    public void Show()
+    public void Show(Action finishedCallback)
     {
         _topContainer.DOAnchorPosY(0, _moveDuration).SetEase(_showEase);
-        _bottomContainer.DOAnchorPosX(0, _moveDuration).SetEase(_showEase);
+        _bottomContainer.DOAnchorPosX(0, _moveDuration).SetEase(_showEase).OnComplete(finishedCallback.Invoke);
     }
 
     public void Hide(Action finishCallback)

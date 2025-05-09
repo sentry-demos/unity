@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 namespace Game
@@ -9,6 +10,7 @@ namespace Game
         
         private readonly PlayerInput _input;
         private readonly Camera _camera;
+        private readonly GameData _data;
         
         public GameStateApplyUpgrade(GameStateMachine stateMachine) : base(stateMachine)
         {
@@ -17,6 +19,7 @@ namespace Game
             
             _input = PlayerInput.Instance;
             _camera = Camera.main;
+            _data = GameData.Instance;
         }
 
         public override void OnEnter()
@@ -25,6 +28,10 @@ namespace Game
 
             _applyUpgradeMenu.Show();
 
+            if (_data.UnattendedMode)
+            {
+                _stateMachine.StartCoroutine(ContinuePlaying());
+            }
         }
 
         public override void Tick()
@@ -61,6 +68,29 @@ namespace Game
                     StateTransition(GameStates.Fight);
                 }
             }
+        }
+        
+        private IEnumerator ContinuePlaying()
+        {
+            yield return new WaitForSeconds(Random.value);
+            
+            var sentry = GameObject.FindFirstObjectByType<SentryTower>();
+            switch (_stateMachine.PickedUpgrade)
+            {
+                case UpgradeType.Damage:
+                    sentry.Upgrades.Damage++;
+                    break;
+                case UpgradeType.FireRate:
+                    sentry.Upgrades.FireRate++;
+                    break;
+                case UpgradeType.Range:
+                    sentry.Upgrades.Range++;
+                    break;
+            }
+
+            sentry.PostUpgrade();
+                    
+            StateTransition(GameStates.Fight);
         }
         
         public override void OnExit()

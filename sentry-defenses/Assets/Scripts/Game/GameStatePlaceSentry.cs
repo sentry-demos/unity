@@ -1,8 +1,9 @@
-using Manager;
+using System.Collections;
 using UnityEngine;
 
 public class GameStatePlaceSentry : GameState
 {
+    private readonly GameStateMachine _stateMachine;
     private readonly PlayerInput _input;
     private readonly GameData _data;
     private readonly Transform _mouseTransform;
@@ -11,6 +12,7 @@ public class GameStatePlaceSentry : GameState
     
     public GameStatePlaceSentry(GameStateMachine stateMachine) : base(stateMachine)
     {
+        _stateMachine = stateMachine;
         _input = PlayerInput.Instance;
         _data = GameData.Instance;
         _mouseTransform = stateMachine.MouseTransform;
@@ -39,5 +41,34 @@ public class GameStatePlaceSentry : GameState
             
             StateTransition(GameStates.Fight);
         }
+    }
+
+    public override void OnEnter()
+    {
+        base.OnEnter();
+        
+        if (_data.UnattendedMode)
+        {
+            var spawnPosition = Random.insideUnitSphere;
+            spawnPosition.z = 0;
+            _sentryGameObject = GameObject.Instantiate(_data.SentryPrefab, spawnPosition, Quaternion.identity);
+            var sentry = _sentryGameObject.GetComponent<SentryTower>();
+            sentry.Wiggle();
+            
+            _stateMachine.StartCoroutine(ContinuePlaying());
+        }
+    }
+
+    private IEnumerator ContinuePlaying()
+    {
+        yield return new WaitForSeconds(Random.value);
+        
+        var sentry = _sentryGameObject.GetComponent<SentryTower>();
+        sentry.Drop();
+            
+        _sentryGameObject.transform.parent = null;
+        _sentryGameObject = null;
+            
+        StateTransition(GameStates.Fight);
     }
 }

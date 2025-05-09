@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Manager;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -83,7 +82,7 @@ public class SentryTower : MonoBehaviour
         if (_isPaused) { return; }
 
         if (_targets.Count <= 0) { return; }
- 
+        
         _coolDown -= Time.deltaTime;
         if (_coolDown <= 0.0f)
         {
@@ -94,9 +93,9 @@ public class SentryTower : MonoBehaviour
 
     public void PostUpgrade()
     {
-        float radius = Mathf.Pow(1.10f, Upgrades.Range);
+        var radius = SentryCalculator.GetTowerRadius(Upgrades.Range);
         CircleTransform.transform.localScale = new Vector2(radius, radius);
-        AttackRangeCollider.radius = 1.35f * radius;
+        AttackRangeCollider.radius = SentryCalculator.GetAttackRangeRadius(radius);
     }
 
     private void Fire()

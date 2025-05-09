@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class GameData : MonoSingleton<GameData>
 {
+    public bool UnattendedMode = false;
     public GameObject SentryPrefab;
     public TowerUpgrade Upgrade = new TowerUpgrade();
     public List<GameObject> bugs = new List<GameObject>();

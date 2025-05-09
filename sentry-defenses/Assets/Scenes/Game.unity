@@ -488,6 +488,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: deed909643fcc4bd080e079a5b274b6f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  UnattendedMode: 1
   SentryPrefab: {fileID: 356934927671453552, guid: ae5f5367b8f56453bb707879962084d9, type: 3}
   bugs: []
   StartHitPoints: 5
