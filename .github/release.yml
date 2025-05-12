@@ -1,0 +1,19 @@
+name: release.yml
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release
+        required: true
+
+jobs:
+  senty-defenses-release:
+    name: Release Build of Sentry-Defenses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Deploy Script
+        run: ./deploy_project.sh ${{ github.event.inputs.version }} ${{ secrets.SENTRY_ORG }} ${{ secrets.SENTRY_PROJECT }} ${{ secrets.SENTRY_AUTH_TOKEN }}
+        shell: sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
