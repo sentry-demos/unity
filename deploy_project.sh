@@ -21,6 +21,6 @@ if [ "$currentVersion" != "" ]; then
 fi
 
 echo "Releasing to Github..."
-gh release create $PACKAGE_VERSION sentry-defenses/Builds/Sentry-Defenses.apk -t "$PACKAGE_VERSION" --generate-notes || error_exit "Failed to create GitHub release."
+gh release create $PACKAGE_VERSION sentry-defenses/Builds/Sentry-Defenses.apk -R $REPO -t "$PACKAGE_VERSION" --generate-notes || error_exit "Failed to create GitHub release."
 
 echo "Release created successfully with version $PACKAGE_VERSION!"
