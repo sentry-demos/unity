@@ -10,7 +10,7 @@
     "com.unity.test-framework": "1.5.1",
     "com.unity.timeline": "1.8.8",
     "com.unity.ugui": "2.0.0",
-    "io.sentry.unity.dev": "file:/Users/bitfox/Workspace/sentry-unity/package-dev",
+    "io.sentry.unity": "https://github.com/getsentry/unity.git#3.2.2",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",

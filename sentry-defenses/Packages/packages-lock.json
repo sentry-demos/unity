@@ -189,11 +189,12 @@
         "com.unity.modules.imgui": "1.0.0"
       }
     },
-    "io.sentry.unity.dev": {
-      "version": "file:/Users/bitfox/Workspace/sentry-unity/package-dev",
+    "io.sentry.unity": {
+      "version": "https://github.com/getsentry/unity.git#3.2.2",
       "depth": 0,
-      "source": "local",
-      "dependencies": {}
+      "source": "git",
+      "dependencies": {},
+      "hash": "07c39f9d99552c9dd57d5e09bbdfd4b409089a01"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
