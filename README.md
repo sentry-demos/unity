@@ -14,3 +14,7 @@ https://youtu.be/KzvJJzpSQaw
 ![screenshot](.github/screenshot.png)
 
 This was a Hackweek 2021 project.
+
+# Requirements
+- Emulator must have at least 4GB of RAM, as it will crash on launch if you don't have enough
+- 
