@@ -2,10 +2,10 @@ name: Build Sentaur Survivors
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - release/*
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
 env:
   UNITY_VERSION: '6000.1.12f1'
