@@ -3,11 +3,16 @@ name: Run Windows Build
 on:
   workflow_call:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Build Sentaur Survivors"]
+    types:
+      - completed
 
 jobs:
   test-windows:
     name: Test Windows Build
     runs-on: windows-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     
     steps:
       - name: Download Windows Build
@@ -15,8 +20,8 @@ jobs:
         with:
           name: Build-StandaloneWindows64
           path: ./build
-          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
       
       - name: Run Windows Build
         run: |
