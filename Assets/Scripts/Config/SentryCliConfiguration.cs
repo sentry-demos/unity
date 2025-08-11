@@ -1,6 +1,5 @@
+using System;
 using Sentry.Unity;
-using UnityEditor.Build;
-using UnityEngine;
 
 public class SentryCliConfiguration : SentryCliOptionsConfiguration
 {
@@ -13,7 +12,7 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         }
         else
         {
-            throw new BuildFailedException("Failed to fetch `auth_token` from the command line arguments");
+            throw new InvalidOperationException("Failed to fetch `auth_token` from the command line arguments");
         }
 
         cliOptions.Organization = "demo";

@@ -1,6 +1,5 @@
+using System;
 using Sentry.Unity;
-using UnityEditor.Build;
-using UnityEngine;
 
 public class SentryOptionConfiguration : SentryOptionsConfiguration
 {
@@ -13,7 +12,7 @@ public class SentryOptionConfiguration : SentryOptionsConfiguration
         }
         else
         {
-            throw new BuildFailedException("Failed to fetch `dsn` from the command line arguments");
+            throw new InvalidOperationException("Failed to fetch `dsn` from the command line arguments");
         }
     }
 }
