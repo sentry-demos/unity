@@ -59,6 +59,7 @@ jobs:
           targetPlatform: ${{ matrix.targetPlatform }}
           unityLicensingServer: ${{ secrets.LICENSE_SERVER_URL }}
           buildName: SentaurSurvivors-${{ matrix.targetPlatform }}
+          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }}
           allowDirtyBuild: true
 
       - name: Upload Build Artifact
