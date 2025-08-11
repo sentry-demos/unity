@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-      - release/*
   pull_request:
+  workflow_dispatch: # e.g. to manually trigger on foreign PRs
 
 env:
   UNITY_VERSION: '6000.1.12f1'
@@ -77,3 +77,8 @@ jobs:
           name: Build-${{ matrix.targetPlatform }}
           path: build
           retention-days: 14
+
+  run-demo:
+    name: Run Demo
+    needs: [build]
+    uses: ./.github/workflows/run-demo.yml
