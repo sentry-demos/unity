@@ -1,10 +1,11 @@
-name: Test Windows Build
+name: Run Windows Build
 
 on:
   workflow_run:
     workflows: ["Build Sentaur Survivors"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   test-windows:
@@ -23,12 +24,12 @@ jobs:
       
       - name: Run Windows Build
         run: |
-          $exePath = Get-ChildItem -Path "./build" -Filter "*.exe" -Recurse | Select-Object -First 1
+          $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
             Start-Process -FilePath $exePath -ArgumentList "-dsn", "${{ secrets.DSN }}" -Wait -PassThru -NoNewWindow
             Write-Output "Build executed successfully"
           } else {
-            Write-Error "No executable found in build artifacts"
+            Write-Error "No SentaurSurvivors executable found in build artifacts"
             exit 1
           }
