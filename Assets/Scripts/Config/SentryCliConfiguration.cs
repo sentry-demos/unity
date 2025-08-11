@@ -14,5 +14,8 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         {
             Debug.LogError("Failed to fetch `auth_token` from the command line arguments");
         }
+
+        cliOptions.Organization = "demo";
+        cliOptions.Project = "unity";
     }
 }
