@@ -59,6 +59,14 @@ jobs:
             Library-${{ matrix.targetPlatform }}-
             Library-
 
+      - name: Cache Build Output
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: Build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Build-${{ matrix.targetPlatform }}-
+
       - run: echo "::add-mask::${{ secrets.LICENSE_SERVER_URL }}"
 
       - uses: game-ci/unity-builder@v4
