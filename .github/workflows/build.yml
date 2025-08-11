@@ -11,6 +11,14 @@ env:
   UNITY_VERSION: '6000.1.12f1'
 
 jobs:
+  cancel-previous-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # pin@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
   build:
     name: Build for ${{ matrix.targetPlatform }}
     runs-on: ${{ matrix.os }}

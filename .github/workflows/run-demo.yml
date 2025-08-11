@@ -1,0 +1,34 @@
+name: Test Windows Build
+
+on:
+  workflow_run:
+    workflows: ["Build Sentaur Survivors"]
+    types:
+      - completed
+
+jobs:
+  test-windows:
+    name: Test Windows Build
+    runs-on: windows-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Download Windows Build
+        uses: actions/download-artifact@v4
+        with:
+          name: Build-StandaloneWindows64
+          path: ./build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run Windows Build
+        run: |
+          $exePath = Get-ChildItem -Path "./build" -Filter "*.exe" -Recurse | Select-Object -First 1
+          if ($exePath) {
+            Write-Output "Found executable: $($exePath.FullName)"
+            Start-Process -FilePath $exePath -ArgumentList "-dsn", "${{ secrets.DSN }}" -Wait -PassThru -NoNewWindow
+            Write-Output "Build executed successfully"
+          } else {
+            Write-Error "No executable found in build artifacts"
+            exit 1
+          }
