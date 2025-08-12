@@ -27,7 +27,22 @@ jobs:
           $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
+            $startTime = Get-Date
             Start-Process -FilePath $exePath -ArgumentList "-dsn", "${{ secrets.DSN }}" -Wait -PassThru -NoNewWindow
+            $endTime = Get-Date
+            $duration = $endTime - $startTime
+            Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
+            
+            # Capture Unity logs
+            $logPath = "$env:USERPROFILE\AppData\LocalLow\Sentry\SentaurSurvivors\Player.log"
+            if (Test-Path $logPath) {
+              Write-Output "::group::Unity Game Logs"
+              Get-Content $logPath
+              Write-Output "::endgroup::"
+            } else {
+              Write-Output "Unity log file not found at: $logPath"
+            }
+            
             Write-Output "Build executed successfully"
           } else {
             Write-Error "No SentaurSurvivors executable found in build artifacts"
