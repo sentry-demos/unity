@@ -5,6 +5,11 @@ public class SentryOptionConfiguration : SentryOptionsConfiguration
 {
     public override void Configure(SentryUnityOptions options)
     {
+        if (options.Dsn is not null)
+        {
+            return;
+        }
+        
         var dsn = ArgumentReader.GetCommandLineArg("dsn");
         if (!string.IsNullOrEmpty(dsn))
         {

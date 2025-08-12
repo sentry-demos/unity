@@ -5,6 +5,11 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
 {
     public override void Configure(SentryCliOptions cliOptions)
     {
+        if (cliOptions.Auth is not null)
+        {
+            return;
+        }
+        
         var token = ArgumentReader.GetCommandLineArg("auth_token");
         if (!string.IsNullOrEmpty(token))
         {
@@ -17,5 +22,6 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
 
         cliOptions.Organization = "demo";
         cliOptions.Project = "unity";
+        cliOptions.UrlOverride = "https://sentry.io";
     }
 }
