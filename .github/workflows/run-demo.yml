@@ -28,7 +28,8 @@ jobs:
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
             $startTime = Get-Date
-            Start-Process -FilePath $exePath -ArgumentList @("-dsn", "${{ secrets.DSN }}") -Wait -PassThru -NoNewWindow
+            $argumentList = "-dsn","${{ secrets.DSN }}"
+            Start-Process -FilePath $exePath -ArgumentList $argumentList -Wait -PassThru -NoNewWindow
             $endTime = Get-Date
             $duration = $endTime - $startTime
             Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
