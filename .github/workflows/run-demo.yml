@@ -28,6 +28,7 @@ jobs:
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
             $startTime = Get-Date
+            Write-Output "DSN length: $('${{ secrets.DSN }}'.Length)"
             $argumentList = "-dsn","${{ secrets.DSN }}"
             Start-Process -FilePath $exePath -ArgumentList $argumentList -Wait -PassThru -NoNewWindow
             $endTime = Get-Date
