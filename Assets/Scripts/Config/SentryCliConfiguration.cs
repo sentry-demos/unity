@@ -1,23 +1,28 @@
-using System;
 using Sentry.Unity;
+using UnityEngine;
 
 public class SentryCliConfiguration : SentryCliOptionsConfiguration
 {
     public override void Configure(SentryCliOptions cliOptions)
     {
+        Debug.Log("Calling into the 'Configure' callback for CLI options.");
+        
         if (cliOptions.Auth is not null)
         {
+            Debug.Log("The 'AUTH TOKEN' is already set.");
             return;
         }
         
+        Debug.Log("Getting the 'AUTH TOKEN' from the commandline arguments.");
         var token = ArgumentReader.GetCommandLineArg("auth_token");
         if (!string.IsNullOrEmpty(token))
         {
+            Debug.Log("Setting the 'AUTH TOKEN'.");
             cliOptions.Auth = token;
         }
         else
         {
-            throw new InvalidOperationException("Failed to fetch `auth_token` from the command line arguments");
+            Debug.LogError("Failed to get the 'AUTH TOKEN'.");
         }
 
         cliOptions.Organization = "demo";

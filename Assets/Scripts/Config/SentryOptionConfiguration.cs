@@ -1,23 +1,28 @@
-using System;
 using Sentry.Unity;
+using UnityEngine;
 
 public class SentryOptionConfiguration : SentryOptionsConfiguration
 {
     public override void Configure(SentryUnityOptions options)
     {
+        Debug.Log("Calling into the 'Configure' callback.");
+        
         if (options.Dsn is not null)
         {
+            Debug.Log("The 'DSN' is already set.");
             return;
         }
         
+        Debug.Log("Getting the 'DSN' from the commandline arguments.");
         var dsn = ArgumentReader.GetCommandLineArg("dsn");
         if (!string.IsNullOrEmpty(dsn))
         {
+            Debug.Log("Setting the 'DSN'.");
             options.Dsn = dsn;
         }
         else
         {
-            throw new InvalidOperationException("Failed to fetch `dsn` from the command line arguments");
+            Debug.LogError("Failed to get the 'DSN'.");
         }
     }
 }
