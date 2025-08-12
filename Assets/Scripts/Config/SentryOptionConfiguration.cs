@@ -13,16 +13,27 @@ public class SentryOptionConfiguration : SentryOptionsConfiguration
             return;
         }
         
-        Debug.Log("Getting the 'DSN' from the commandline arguments.");
-        var dsn = ArgumentReader.GetCommandLineArg("dsn");
+        Debug.Log("Getting the 'DSN' from the environment.");
+        
+        var dsn = System.Environment.GetEnvironmentVariable("SENTRY_DSN");
         if (!string.IsNullOrEmpty(dsn))
         {
-            Debug.Log("Setting the 'DSN'.");
+            Debug.Log("Setting the 'DSN' from environment variable.");
+            options.Dsn = dsn;
+            return;
+        }
+        
+        Debug.Log("Getting the 'DSN' from the commandline arguments.");
+        
+        dsn = ArgumentReader.GetCommandLineArg("dsn");
+        if (!string.IsNullOrEmpty(dsn))
+        {
+            Debug.Log("Setting the 'DSN' from command line arguments.");
             options.Dsn = dsn;
         }
         else
         {
-            Debug.LogError("Failed to get the 'DSN'.");
+            Debug.LogError("Failed to get the 'DSN' from both environment variable and command line arguments.");
         }
     }
 }

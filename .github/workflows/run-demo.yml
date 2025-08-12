@@ -23,14 +23,14 @@ jobs:
           run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
       
       - name: Run Windows Build
+        env:
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: |
           $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
             $startTime = Get-Date
-            Write-Output "DSN length: $('${{ secrets.DSN }}'.Length)"
-            $argumentList = "-dsn","${{ secrets.DSN }}"
-            Start-Process -FilePath $exePath -ArgumentList $argumentList -Wait -PassThru -NoNewWindow
+            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow
             $endTime = Get-Date
             $duration = $endTime - $startTime
             Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
