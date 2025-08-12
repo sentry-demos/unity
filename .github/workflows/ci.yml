@@ -92,3 +92,4 @@ jobs:
     name: Run Demo
     needs: [build]
     uses: ./.github/workflows/run-demo.yml
+    secrets: inherit
