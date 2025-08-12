@@ -1,4 +1,4 @@
-name: Run Windows Build
+name: Run Demo Builds
 
 on:
   workflow_call:
@@ -54,3 +54,108 @@ jobs:
             Write-Error "No SentaurSurvivors executable found in build artifacts"
             exit 1
           }
+
+  test-android:
+    name: Test Android Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download Android Build
+        uses: actions/download-artifact@v4
+        with:
+          name: Build-Android
+          path: ./build
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: AVD cache
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-29
+
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Find APK file
+        id: find-apk
+        run: |
+          APK_FILE=$(find ./build -name "*.apk" -type f | head -1)
+          if [ -z "$APK_FILE" ]; then
+            echo "Error: No APK file found in build artifacts"
+            exit 1
+          fi
+          echo "Found APK: $APK_FILE"
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+
+      - name: Run Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SENTRY_DSN: ${{ secrets.DSN }}
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            echo "Installing APK..."
+            adb install "${{ steps.find-apk.outputs.apk_path }}"
+            
+            echo "Starting app..."
+            # Get package name from APK
+            PACKAGE_NAME=$(aapt dump badging "${{ steps.find-apk.outputs.apk_path }}" | grep package | awk '{print $2}' | sed "s/name='//" | sed "s/'.*//")
+            echo "Package name: $PACKAGE_NAME"
+            
+            # Get main activity
+            MAIN_ACTIVITY=$(aapt dump badging "${{ steps.find-apk.outputs.apk_path }}" | grep "launchable-activity" | awk '{print $2}' | sed "s/name='//" | sed "s/'.*//")
+            echo "Main activity: $MAIN_ACTIVITY"
+            
+            # Pass DSN as Intent extra for Android runtime configuration
+            adb shell am start -n $PACKAGE_NAME/$MAIN_ACTIVITY --es dsn "$SENTRY_DSN"
+            
+            echo "App started, waiting for execution..."
+            sleep 5
+            
+            # Check if app is running
+            adb shell "ps | grep $PACKAGE_NAME" || echo "App might not be running"
+            
+            echo "Waiting for app to initialize..."
+            sleep 25
+            
+            echo "Capturing logs..."
+            adb logcat -d | grep -i "unity\|sentry\|sentaur\|dsn\|configure" || echo "No relevant logs found"
+            
+            echo "Stopping app..."
+            adb shell am force-stop $PACKAGE_NAME
+            
+            echo "Android demo completed successfully"
