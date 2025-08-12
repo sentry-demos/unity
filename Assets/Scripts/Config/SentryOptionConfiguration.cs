@@ -9,7 +9,7 @@ public class SentryOptionConfiguration : SentryOptionsConfiguration
         
         if (!string.IsNullOrEmpty(options.Dsn))
         {
-            Debug.Log("The 'DSN' is already set and taken from local options.");
+            Debug.Log("The 'DSN' is already set.");
             return;
         }
         

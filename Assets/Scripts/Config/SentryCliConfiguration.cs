@@ -9,7 +9,7 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         
         if (!string.IsNullOrEmpty(cliOptions.Auth))
         {
-            Debug.Log("The 'AUTH TOKEN' is already set and taken from local cli options.");
+            Debug.Log("The 'AUTH TOKEN' is already set.");
             return;
         }
         
