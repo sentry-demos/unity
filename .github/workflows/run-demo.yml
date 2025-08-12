@@ -29,8 +29,12 @@ jobs:
           $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath) {
             Write-Output "Found executable: $($exePath.FullName)"
+            Write-Output "SENTRY_DSN is set: $(![string]::IsNullOrEmpty($env:SENTRY_DSN))"
+            Write-Output "SENTRY_DSN length: $($env:SENTRY_DSN.Length)"
             $startTime = Get-Date
-            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow
+            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow -Environment @{
+              SENTRY_DSN = $env:SENTRY_DSN
+            }
             $endTime = Get-Date
             $duration = $endTime - $startTime
             Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
