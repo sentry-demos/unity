@@ -28,10 +28,10 @@ jobs:
         include:
           - targetPlatform: StandaloneWindows64
             os: windows-latest
-          - targetPlatform: Android
-            os: ubuntu-latest
-          - targetPlatform: StandaloneLinux64
-            os: ubuntu-latest
+          # - targetPlatform: Android
+          #   os: ubuntu-latest
+          # - targetPlatform: StandaloneLinux64
+          #   os: ubuntu-latest
     
     steps:
       - name: Free disk space
