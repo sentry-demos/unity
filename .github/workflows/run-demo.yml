@@ -27,77 +27,33 @@ jobs:
           SENTRY_DSN: ${{ secrets.DSN }}
         run: |
           $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
-          if ($exePath) {
+          if ($exePath)
+          {
             Write-Output "Found executable: $($exePath.FullName)"
-            Write-Output "SENTRY_DSN is set: $(![string]::IsNullOrEmpty($env:SENTRY_DSN))"
-            Write-Output "SENTRY_DSN length: $($env:SENTRY_DSN.Length)"
             $startTime = Get-Date
-            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow -Environment @{
-              SENTRY_DSN = $env:SENTRY_DSN
-            }
+            
+            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow
+            
             $endTime = Get-Date
             $duration = $endTime - $startTime
             Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
             
-            # Capture Unity logs
             $logPath = "$env:USERPROFILE\AppData\LocalLow\Sentry\SentaurSurvivors\Player.log"
-            if (Test-Path $logPath) {
-              Write-Output "::group::Unity Game Logs"
+            if (Test-Path $logPath)
+            {
+              Write-Output "::group::Game Logs"
               Get-Content $logPath
               Write-Output "::endgroup::"
-            } else {
+            }
+            else 
+            {
               Write-Output "Unity log file not found at: $logPath"
             }
             
-            Write-Output "Build executed successfully"
-          } else {
+            Write-Output "Run executed successfully"
+          } 
+          else
+          {
             Write-Error "No SentaurSurvivors executable found in build artifacts"
             exit 1
           }
-      - name: Run Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          SENTRY_DSN: ${{ secrets.DSN }}
-        with:
-          api-level: 29
-          target: google_apis
-          arch: x86_64
-          profile: Nexus 6
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: |
-            echo "Installing APK..."
-            adb install "${{ steps.find-apk.outputs.apk_path }}"
-            
-            echo "Starting app..."
-            # Get package name from installed packages (more reliable after install)
-            PACKAGE_NAME=$(adb shell pm list packages | grep sentaur | head -1 | cut -d: -f2)
-            if [ -z "$PACKAGE_NAME" ]; then
-              # Fallback: try to find Unity package pattern
-              PACKAGE_NAME=$(adb shell pm list packages | grep -i "unity\|sentry\|survivors" | head -1 | cut -d: -f2)
-            fi
-            echo "Package name: $PACKAGE_NAME"
-            
-            # For Unity apps, the main activity is typically the UnityPlayerActivity
-            MAIN_ACTIVITY="com.unity3d.player.UnityPlayerActivity"
-            echo "Main activity: $MAIN_ACTIVITY"
-            
-            # Pass DSN as Intent extra for Android runtime configuration
-            adb shell am start -n $PACKAGE_NAME/$MAIN_ACTIVITY --es dsn "$SENTRY_DSN"
-            
-            echo "App started, waiting for execution..."
-            sleep 5
-            
-            # Check if app is running
-            adb shell "ps | grep $PACKAGE_NAME" || echo "App might not be running"
-            
-            echo "Waiting for app to initialize..."
-            sleep 25
-            
-            echo "Capturing logs..."
-            adb logcat -d | grep -i "unity\|sentry\|sentaur\|dsn\|configure" || echo "No relevant logs found"
-            
-            echo "Stopping app..."
-            adb shell am force-stop $PACKAGE_NAME
-            
-            echo "Android demo completed successfully"
