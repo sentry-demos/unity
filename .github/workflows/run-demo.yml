@@ -9,8 +9,8 @@ on:
       - completed
 
 jobs:
-  test-windows:
-    name: Test Windows Build
+  run-windows:
+    name: Run Windows Build
     runs-on: windows-latest
     
     steps:
@@ -54,68 +54,6 @@ jobs:
             Write-Error "No SentaurSurvivors executable found in build artifacts"
             exit 1
           }
-
-  test-android:
-    name: Test Android Build
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download Android Build
-        uses: actions/download-artifact@v4
-        with:
-          name: Build-Android
-          path: ./build
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Enable KVM group perms
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: AVD cache
-        uses: actions/cache@v4
-        id: avd-cache
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: avd-29
-
-      - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 29
-          target: google_apis
-          arch: x86_64
-          profile: Nexus 6
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
-
-      - name: Find APK file
-        id: find-apk
-        run: |
-          APK_FILE=$(find ./build -name "*.apk" -type f | head -1)
-          if [ -z "$APK_FILE" ]; then
-            echo "Error: No APK file found in build artifacts"
-            exit 1
-          fi
-          echo "Found APK: $APK_FILE"
-          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
-
       - name: Run Android Emulator
         uses: reactivecircus/android-emulator-runner@v2
         env:
@@ -132,12 +70,16 @@ jobs:
             adb install "${{ steps.find-apk.outputs.apk_path }}"
             
             echo "Starting app..."
-            # Get package name from APK
-            PACKAGE_NAME=$(aapt dump badging "${{ steps.find-apk.outputs.apk_path }}" | grep package | awk '{print $2}' | sed "s/name='//" | sed "s/'.*//")
+            # Get package name from installed packages (more reliable after install)
+            PACKAGE_NAME=$(adb shell pm list packages | grep sentaur | head -1 | cut -d: -f2)
+            if [ -z "$PACKAGE_NAME" ]; then
+              # Fallback: try to find Unity package pattern
+              PACKAGE_NAME=$(adb shell pm list packages | grep -i "unity\|sentry\|survivors" | head -1 | cut -d: -f2)
+            fi
             echo "Package name: $PACKAGE_NAME"
             
-            # Get main activity
-            MAIN_ACTIVITY=$(aapt dump badging "${{ steps.find-apk.outputs.apk_path }}" | grep "launchable-activity" | awk '{print $2}' | sed "s/name='//" | sed "s/'.*//")
+            # For Unity apps, the main activity is typically the UnityPlayerActivity
+            MAIN_ACTIVITY="com.unity3d.player.UnityPlayerActivity"
             echo "Main activity: $MAIN_ACTIVITY"
             
             # Pass DSN as Intent extra for Android runtime configuration
