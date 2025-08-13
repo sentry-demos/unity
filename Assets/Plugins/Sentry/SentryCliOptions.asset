@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   <UploadSymbols>k__BackingField: 1
   <UploadDevelopmentSymbols>k__BackingField: 0
-  <UploadSources>k__BackingField: 0
+  <UploadSources>k__BackingField: 1
   <UrlOverride>k__BackingField: 
   <Auth>k__BackingField: 
   <Organization>k__BackingField: demo
