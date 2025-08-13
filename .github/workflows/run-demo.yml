@@ -1,6 +1,8 @@
 name: Run Demo Builds
 
 on:
+  schedule:
+    - cron: '*/50 * * * *' # every 50 minutes
   workflow_call:
   workflow_dispatch:
   workflow_run:
