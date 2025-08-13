@@ -47,8 +47,8 @@ jobs:
 
       - name: Set Unity Version
         run: |
-          UNITY_VERSION=$(grep 'm_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')
-          echo "UNITY_VERSION=$UNITY_VERSION" >> $GITHUB_ENV
+          $UNITY_VERSION = (Get-Content ProjectSettings/ProjectVersion.txt | Select-String 'm_EditorVersion:').ToString().Split(' ')[1]
+          echo "UNITY_VERSION=$UNITY_VERSION" >> $env:GITHUB_ENV
 
       - name: Cache Unity Library
         uses: actions/cache@v4
