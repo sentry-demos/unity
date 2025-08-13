@@ -25,6 +25,7 @@ jobs:
           run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
       
       - name: Run Windows Build
+        timeout-minutes: 10
         env:
           SENTRY_DSN: ${{ secrets.DSN }}
         run: |
