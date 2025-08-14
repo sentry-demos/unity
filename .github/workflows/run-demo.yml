@@ -16,20 +16,20 @@ jobs:
     runs-on: windows-latest
     
     steps:
-      - name: Download Windows Build
+      - name: Download Build
         uses: actions/download-artifact@v4
         with:
-          name: Build-StandaloneWindows64
-          path: ./build
+          name: SentaurSurvivors-StandaloneWindows64
+          path: ./Build
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
       
-      - name: Run Windows Build
+      - name: Run Build
         timeout-minutes: 10
         env:
           SENTRY_DSN: ${{ secrets.DSN }}
         run: |
-          $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
+          $exePath = Get-ChildItem -Path "./Build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath)
           {
             Write-Output "Found executable: $($exePath.FullName)"

@@ -7,9 +7,6 @@ on:
   pull_request:
   workflow_dispatch: # e.g. to manually trigger on foreign PRs
 
-env:
-  UNITY_VERSION: '6000.1.12f1'
-
 jobs:
   cancel-previous-workflow:
     runs-on: ubuntu-latest
@@ -32,7 +29,7 @@ jobs:
             os: ubuntu-latest
     
     steps:
-      - name: Free disk space
+      - name: Free disk space # Android builds runs out of disk space otherwise
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo rm -rf /usr/share/dotnet
@@ -81,15 +78,15 @@ jobs:
           targetPlatform: ${{ matrix.targetPlatform }}
           unityLicensingServer: ${{ secrets.LICENSE_SERVER_URL }}
           buildName: SentaurSurvivors-${{ matrix.targetPlatform }}
-          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }}
+          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }} # Arguments cannot be passed via ENV
           allowDirtyBuild: true
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Build-${{ matrix.targetPlatform }}
-          path: build
+          name: SentaurSurvivors-${{ matrix.targetPlatform }}
+          path: Build
           retention-days: 90
 
   run-demo:
