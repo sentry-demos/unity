@@ -1,0 +1,62 @@
+name: Run Demo Builds
+
+on:
+  schedule:
+    - cron: '*/50 * * * *' # every 50 minutes
+  workflow_call:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build Sentaur Survivors"]
+    types:
+      - completed
+
+jobs:
+  run-windows:
+    name: Run Windows Build
+    runs-on: windows-latest
+    
+    steps:
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneWindows64
+          path: ./Build
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.run_id }}
+      
+      - name: Run Build
+        timeout-minutes: 10
+        env:
+          SENTRY_DSN: ${{ secrets.DSN }}
+        run: |
+          $exePath = Get-ChildItem -Path "./Build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
+          if ($exePath)
+          {
+            Write-Output "Found executable: $($exePath.FullName)"
+            $startTime = Get-Date
+            
+            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow
+            
+            $endTime = Get-Date
+            $duration = $endTime - $startTime
+            Write-Output "Game finished in $($duration.ToString('hh\:mm\:ss'))"
+            
+            $logPath = "$env:USERPROFILE\AppData\LocalLow\Sentry\SentaurSurvivors\Player.log"
+            if (Test-Path $logPath)
+            {
+              Write-Output "::group::Game Logs"
+              Get-Content $logPath
+              Write-Output "::endgroup::"
+            }
+            else 
+            {
+              Write-Output "Unity log file not found at: $logPath"
+            }
+            
+            Write-Output "Run executed successfully"
+          } 
+          else
+          {
+            Write-Error "No SentaurSurvivors executable found in build artifacts"
+            exit 1
+          }

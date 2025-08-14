@@ -1,0 +1,96 @@
+name: Build Sentaur Survivors
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch: # e.g. to manually trigger on foreign PRs
+
+jobs:
+  cancel-previous-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # pin@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+  build:
+    name: Build for ${{ matrix.targetPlatform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - targetPlatform: StandaloneWindows64
+            os: windows-latest
+          - targetPlatform: Android
+            os: ubuntu-latest
+    
+    steps:
+      - name: Free disk space # Android builds runs out of disk space otherwise
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set Unity Version
+        shell: bash
+        run: |
+          UNITY_VERSION=$(grep 'm_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')
+          echo "UNITY_VERSION=$UNITY_VERSION" >> $GITHUB_ENV
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ matrix.targetPlatform }}-
+            Library-
+
+      - name: Cache Build Output
+        uses: actions/cache@v4
+        id: cache-build
+        with:
+          path: build
+          key: Build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Build-${{ matrix.targetPlatform }}-
+
+      - run: echo "::add-mask::${{ secrets.LICENSE_SERVER_URL }}"
+
+      - uses: game-ci/unity-builder@v4
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: ${{ matrix.targetPlatform }}
+          unityLicensingServer: ${{ secrets.LICENSE_SERVER_URL }}
+          buildName: SentaurSurvivors-${{ matrix.targetPlatform }}
+          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }} # Arguments cannot be passed via ENV
+          allowDirtyBuild: true
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SentaurSurvivors-${{ matrix.targetPlatform }}
+          path: Build
+          retention-days: 90
+
+  run-demo:
+    name: Run Demo
+    needs: [build]
+    uses: ./.github/workflows/run-demo.yml
+    secrets: inherit
