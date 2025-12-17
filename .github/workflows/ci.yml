@@ -65,9 +65,9 @@ jobs:
         id: cache-build
         with:
           path: build
-          key: Build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Build-${{ matrix.targetPlatform }}-
+            build-${{ matrix.targetPlatform }}-
 
       - run: echo "::add-mask::${{ secrets.LICENSE_SERVER_URL }}"
 
@@ -86,7 +86,7 @@ jobs:
         if: always()
         with:
           name: SentaurSurvivors-${{ matrix.targetPlatform }}
-          path: Build
+          path: build
           retention-days: 90
 
   run-demo:
