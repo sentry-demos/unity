@@ -24,7 +24,7 @@ jobs:
       matrix:
         include:
           - targetPlatform: StandaloneWindows64
-            os: windows-2019
+            os: windows-2022
           - targetPlatform: Android
             os: ubuntu-latest
     
