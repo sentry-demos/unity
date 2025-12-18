@@ -27,7 +27,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: SentaurSurvivors-StandaloneWindows64
-          path: ./Build
+          path: ./build
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ steps.get-run.outputs.run-id }}
@@ -37,7 +37,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.DSN }}
         run: |
-          $exePath = Get-ChildItem -Path "./Build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
+          $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath)
           {
             Write-Output "Found executable: $($exePath.FullName)"
