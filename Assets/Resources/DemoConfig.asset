@@ -17,7 +17,7 @@ MonoBehaviour:
   _user:
     Username: sentaur_gdc
     Password: survivor_whatsmyageagain42_survivor
-  _autoPlay: 1
-  _notHotDogParticleEffect: 1
-  _fetchUpgradeFromServer: 1
-  _crashOnGameOver: 1
+  _autoPlay: 0
+  _notHotDogParticleEffect: 0
+  _fetchUpgradeFromServer: 0
+  _crashOnGameOver: 0
