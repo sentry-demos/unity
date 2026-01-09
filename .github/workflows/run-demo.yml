@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/50 * * * *' # every 50 minutes
   workflow_call:
+    inputs:
+      build-run-id:
+        description: 'The run ID of the build workflow that created the artifacts'
+        required: false
+        type: string
   workflow_dispatch:
   workflow_run:
     workflows: ["Build Sentaur Survivors"]
@@ -16,18 +21,23 @@ jobs:
     runs-on: windows-latest
     
     steps:
-      - name: Get latest build run
+      - name: Set run ID
+        # Setting the run-ID this way to allow the scheduled run to take from 'main' but also run the demo from a branch
         id: get-run
         run: |
-          $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/runs?status=success&per_page=1" -Headers @{Authorization="Bearer ${{ secrets.GITHUB_TOKEN }}"}
-          $runId = $runs.workflow_runs[0].id
-          echo "run-id=$runId" >> $env:GITHUB_OUTPUT
-      
+          if ("${{ inputs.build-run-id }}" -ne "") {
+            echo "run-id=${{ inputs.build-run-id }}" >> $env:GITHUB_OUTPUT
+          } else {
+            $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" -Headers @{Authorization="Bearer ${{ secrets.GITHUB_TOKEN }}"}
+            $runId = $runs.workflow_runs[0].id
+            echo "run-id=$runId" >> $env:GITHUB_OUTPUT
+          }
+
       - name: Download Build
         uses: actions/download-artifact@v4
         with:
           name: SentaurSurvivors-StandaloneWindows64
-          path: ./Build
+          path: ./build
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ steps.get-run.outputs.run-id }}
@@ -37,7 +47,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.DSN }}
         run: |
-          $exePath = Get-ChildItem -Path "./Build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
+          $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath)
           {
             Write-Output "Found executable: $($exePath.FullName)"

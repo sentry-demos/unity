@@ -17,7 +17,6 @@ public abstract class UpgradePathBase : MonoBehaviour
     protected string _title = "n/a";
     public string Title => _title;
 
-    [SerializeField]
     // NOTE: _descriptions starts at index 0, but level starts at 1
     protected abstract string[] Descriptions { get; }
     public string NextDescription => Descriptions[_level];
