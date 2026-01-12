@@ -10,7 +10,8 @@ public class BeerbootPickup : PickupBase
         var currentEffectCooldownModifier = Player.Instance.WeaponManager.GlobalEffektCooldownModifier;
         Player.Instance.WeaponManager.GlobalEffektCooldownModifier = _cooldownModifier;
 
-        StartCoroutine(ResetEffectCooldown(currentEffectCooldownModifier));
+        // Start coroutine on Player so it survives this pickup being destroyed
+        Player.Instance.StartCoroutine(ResetEffectCooldown(currentEffectCooldownModifier));
     }
 
     private IEnumerator ResetEffectCooldown(float cooldownModifier)
