@@ -1,30 +1,39 @@
-using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace Characters
 {
     public class DemoPlayerController : MonoBehaviour
     {
         private DemoConfiguration _demoConfig;
-        private Rigidbody2D _rigidBody;
         private Transform _enemiesTransform;
         private Transform _pickupsTransform;
         private Transform _xpDropsTransform;
         private Dart _dart;
-        
-        [SerializeField]
-        private float _moveSpeed = 5f;
+        private Gamepad _virtualGamepad;
 
         private void Awake()
         {
             _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
         }
 
+        private void OnEnable()
+        {
+            _virtualGamepad = InputSystem.AddDevice<Gamepad>("DemoAutoPlayGamepad");
+        }
+
+        private void OnDisable()
+        {
+            if (_virtualGamepad != null)
+            {
+                InputSystem.RemoveDevice(_virtualGamepad);
+                _virtualGamepad = null;
+            }
+        }
+
         private void Start()
         {
-            // Get the RigidBody2D from the GameObject
-            _rigidBody = GetComponent<Rigidbody2D>();
-            
             // Find the Level GameObject and get references to child transforms
             GameObject levelObject = GameObject.Find("Level");
             if (levelObject != null)
@@ -37,7 +46,7 @@ namespace Characters
             {
                 Debug.LogWarning("Level GameObject not found!");
             }
-            
+
             // Get the Dart component from child transforms
             _dart = GetComponentInChildren<Dart>();
             if (_dart == null)
@@ -58,17 +67,14 @@ namespace Characters
         private void HandleMovement()
         {
             Transform targetTransform = GetClosestXpDrop();
-            
+
             // If no XpDrop found, look for closest Pickup
             if (targetTransform == null)
             {
                 targetTransform = GetClosestPickup();
             }
-            
-            if (targetTransform != null)
-            {
-                MoveTowardsTarget(targetTransform);
-            }
+
+            MoveTowardsTarget(targetTransform);
         }
 
         private void HandleShooting()
@@ -155,10 +161,15 @@ namespace Characters
 
         private void MoveTowardsTarget(Transform target)
         {
-            if (_rigidBody != null && target != null)
+            var direction = Vector2.zero;
+            if (target != null)
             {
-                var direction = (target.position - transform.position).normalized;
-                _rigidBody.linearVelocity = direction * _moveSpeed;
+                direction = (target.position - transform.position).normalized;
+            }
+         
+            if (_virtualGamepad != null)
+            {
+                InputSystem.QueueStateEvent(_virtualGamepad, new GamepadState { leftStick = direction });
             }
         }
     }

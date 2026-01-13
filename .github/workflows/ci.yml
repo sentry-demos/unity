@@ -55,10 +55,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
           restore-keys: |
+            Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-
             Library-${{ matrix.targetPlatform }}-
-            Library-
 
       - name: Cache Build Output
         uses: actions/cache@v4

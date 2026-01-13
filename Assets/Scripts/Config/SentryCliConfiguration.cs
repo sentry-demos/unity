@@ -26,6 +26,11 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
             Debug.LogError("Failed to get the 'AUTH TOKEN' from both environment variable and command line arguments.");
         }
 
+#if UNITY_ANDROID
+        // TODO: sentry-cli seems to choke in CI trying to upload
+        cliOptions.UploadSources = false;
+#endif
+        
         cliOptions.Organization = "demo";
         cliOptions.Project = "unity";
         cliOptions.UrlOverride = "https://sentry.io";
