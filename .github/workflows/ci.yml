@@ -6,6 +6,8 @@ on:
       - main
   pull_request:
   workflow_dispatch: # e.g. to manually trigger on foreign PRs
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight to ensure artifacts don't expire
 
 jobs:
   cancel-previous-workflow:
