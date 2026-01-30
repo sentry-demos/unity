@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using SceneManagers;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,6 +17,7 @@ public class HUD : MonoBehaviour
     [SerializeField] private ScorePoster _scorePoster;
     [SerializeField] private GameObject _tryAgain;
     [SerializeField] private GameObject _quit;
+    [SerializeField] private HUDManager _hudManager;
 
     private DemoConfiguration _demoConfig;
     private XpBar _xpBar;
