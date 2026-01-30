@@ -241,6 +241,17 @@
                 },
                 {
                     "name": "",
+                    "id": "d1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f6a",
+                    "path": "<DualShockGamepad>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "0328a504-56c9-413d-b17e-f54c8515dee2",
                     "path": "<Touchscreen>/Press",
                     "interactions": "",
@@ -746,6 +757,17 @@
                     "name": "",
                     "id": "2b76180b-bc1b-4768-ae01-060e98b1d64a",
                     "path": "<XInputController>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b",
+                    "path": "<DualShockGamepad>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
