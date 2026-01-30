@@ -80,6 +80,12 @@ public class HUD : MonoBehaviour
         _gameOverText.enabled = false;
         _tryAgain.SetActive(false);
         _quit.SetActive(false);
+        
+        // Clear the highlighted button to prevent accidental clicks
+        if (_hudManager != null)
+        {
+            _hudManager.ClearHighlightedButton();
+        }
     }
 
     public void ShowGameOver()

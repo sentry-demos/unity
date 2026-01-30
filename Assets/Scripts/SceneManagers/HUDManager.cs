@@ -45,7 +45,11 @@ namespace SceneManagers
                 return;
             }
             
-            _highlightedButton?.GetComponent<Button>().onClick.Invoke();
+            // Only invoke if the highlighted button is actually active
+            if (_highlightedButton != null && _highlightedButton.activeSelf)
+            {
+                _highlightedButton.GetComponent<Button>().onClick.Invoke();
+            }
         }
 
         private void OnNavigatePerformed(InputAction.CallbackContext context)
@@ -94,6 +98,13 @@ namespace SceneManagers
         
             highlighted.Highlight();
             _highlightedButton = highlighted.gameObject;
+        }
+        
+        public void ClearHighlightedButton()
+        {
+            _tryAgainHighlighter.Highlight(false);
+            _quitHighlighter.Highlight(false);
+            _highlightedButton = null;
         }
     }
 }
