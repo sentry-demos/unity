@@ -3,8 +3,8 @@
 A Sentry-themed Vampire Survivors clone written for Unity in C# featuring:
 * Fast paced 2D shoot 'em up action!
 * 4 weapons with their own unique behavior and upgrade paths
-* 6 different enemies
-* 5 tactical item pickups
+* 7 different enemies
+* 6 tactical item pickups
 
 🍿 Watch [the original trailer on YouTube](https://www.youtube.com/watch?v=8z4T97gJ7Rg)
 
@@ -38,8 +38,9 @@ You have a couple choices for playing:
 
 
 #### Mobile 📱
-* Touch and drag to move
-* Auto-aim + auto-fire
+* Touch and drag Left on-screen joystick to move
+* Touch and drag Right on-screen joystick to aim
+* Tap to select upgrades
 
 ## Dependencies
 
