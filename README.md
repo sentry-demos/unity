@@ -20,10 +20,26 @@ You have a couple choices for playing:
 
 ### How to play
 
-* WASD to move
-* Mouse to aim
 * Defeat enemies and pick up XP
+* Choose your upgrades wisely
 * Survive!
+
+#### Keyboard ⌨️
+* WASD/arrow keys to move + select upgrades
+* Mouse to aim + select/confirm upgrades
+* Spacebar to confirm upgrades
+* ESC to pause
+
+
+#### Controller 🎮
+* Left thumbstick to move + select upgrades
+* Right thumbstick to aim
+* <img src="https://upload.wikimedia.org/wikipedia/commons/8/8f/PlayStation_button_X.svg" alt="PlayStation X button" width="18" valign="middle"> (PlayStation)  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d2/Xbox_button_A.svg" alt="Xbox A button" width="18" valign="middle"> (Xbox)  <img src="https://i.imgur.com/hcF1Jgl.png" alt="Xbox A button" width="20" valign="middle"> (Switch) select upgrade
+
+
+#### Mobile 📱
+* Touch and drag to move
+* Auto-aim + auto-fire
 
 ## Dependencies
 
@@ -35,7 +51,7 @@ See [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Leaderboard / Top 10
 
-Live leaderboard: http://sentaur-survivor.com
+Live leaderboard: http://sentaur-survivor.com ([repo](https://github.com/getsentry/sentaur-leaderboard))
 
 ## Credits
 
@@ -60,3 +76,5 @@ Game source code, art assets, and sound effects are licensed under Apache 2.0 (s
 The in-game music track, ["37 ohmperios" by Rolemusic](https://freemusicarchive.org/music/Rolemusic/single/37-ohmperios/), is used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 DOTween is distributed under [DOTween's Artistic License](https://dotween.demigiant.com/license.php).
+
+Controller button icons from [Wikimedia Commons](https://commons.wikimedia.org/) are used under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
