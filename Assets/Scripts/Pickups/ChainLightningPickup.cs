@@ -57,6 +57,6 @@ public class ChainLightningPickup : PickupBase
 
     protected override string GetEffectText()
     {
-        return "Chain lightning!";
+        return "Seer sees all!";
     }
 }

@@ -49,6 +49,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _lineRenderer: {fileID: 6000012}
   _lightningDisplayDuration: 0.15
+  _bobAmplitude: 0.08
+  _bobFrequency: 0.5
 --- !u!212 &6000004
 SpriteRenderer:
   m_ObjectHideFlags: 0

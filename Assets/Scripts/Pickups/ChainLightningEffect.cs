@@ -22,6 +22,16 @@ public class ChainLightningEffect : MonoBehaviour
     [Tooltip("How long the lightning line is visible in seconds.")]
     private float _lightningDisplayDuration = 0.5f;
 
+    [SerializeField]
+    [Tooltip("Vertical bobbing amplitude above the player (world units).")]
+    private float _bobAmplitude = 0.08f;
+
+    [SerializeField]
+    [Tooltip("Bobbing speed (cycles per second).")]
+    private float _bobFrequency = 0.5f;
+
+    private float _baseLocalY;
+
     /// <summary>
     /// Configure the effect. Call after instantiating, before the effect runs.
     /// </summary>
@@ -51,8 +61,19 @@ public class ChainLightningEffect : MonoBehaviour
 
     private void Start()
     {
+        _baseLocalY = transform.localPosition.y;
         _expirationTime = Time.time + _duration;
         _effectCoroutine = StartCoroutine(EffectLoop());
+    }
+
+    private void Update()
+    {
+        // Frequency in Hz (cycles per second); 2*PI converts to radians per second
+        float radiansPerSecond = _bobFrequency * 2f * Mathf.PI;
+        float bob = _bobAmplitude * Mathf.Sin(Time.time * radiansPerSecond);
+        var pos = transform.localPosition;
+        pos.y = _baseLocalY + bob;
+        transform.localPosition = pos;
     }
 
     private void OnDisable()
