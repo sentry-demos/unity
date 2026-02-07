@@ -20,7 +20,7 @@ public class ChainLightningEffect : MonoBehaviour
 
     [SerializeField]
     [Tooltip("How long the lightning line is visible in seconds.")]
-    private float _lightningDisplayDuration = 0.15f;
+    private float _lightningDisplayDuration = 0.5f;
 
     /// <summary>
     /// Configure the effect. Call after instantiating, before the effect runs.
@@ -79,8 +79,8 @@ public class ChainLightningEffect : MonoBehaviour
 
     private void StrikeChainLightning()
     {
-        Transform playerTransform = transform.parent != null ? transform.parent : Player.Instance.transform;
-        Vector3 origin = playerTransform.position;
+        // Lightning originates from the Seer sprite (this effect's position above the player)
+        Vector3 origin = transform.position;
 
         List<Enemy> chain = BuildChain(origin);
         if (chain.Count == 0)
@@ -203,18 +203,25 @@ public class ChainLightningEffect : MonoBehaviour
     private IEnumerator ShowLightningCoroutine(Vector3 origin, List<Enemy> chain)
     {
         _lineRenderer.positionCount = chain.Count + 1;
-        _lineRenderer.SetPosition(0, origin);
-
+        Vector3[] targetPositions = new Vector3[chain.Count];
         for (int i = 0; i < chain.Count; i++)
         {
             if (chain[i] != null && chain[i].gameObject.activeInHierarchy)
-                _lineRenderer.SetPosition(i + 1, chain[i].transform.position);
+                targetPositions[i] = chain[i].transform.position;
             else
-                _lineRenderer.SetPosition(i + 1, i > 0 ? _lineRenderer.GetPosition(i) : origin);
+                targetPositions[i] = i > 0 ? targetPositions[i - 1] : origin;
         }
 
         _lineRenderer.enabled = true;
-        yield return new WaitForSeconds(_lightningDisplayDuration);
+        float elapsed = 0f;
+        while (elapsed < _lightningDisplayDuration)
+        {
+            _lineRenderer.SetPosition(0, transform.position);
+            for (int i = 0; i < targetPositions.Length; i++)
+                _lineRenderer.SetPosition(i + 1, targetPositions[i]);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
         if (_lineRenderer != null)
             _lineRenderer.enabled = false;
     }

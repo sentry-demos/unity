@@ -93,8 +93,8 @@ SpriteRenderer:
   m_SortingLayerID: 23827671
   m_SortingLayer: -1
   m_SortingOrder: 1
-  m_Sprite: {fileID: 21300000, guid: 5e2a42506cbea4b5293b0461bc112382, type: 3}
-  m_Color: {r: 0, g: 0.85069597, b: 0.9716981, a: 1}
+  m_Sprite: {fileID: 3112027180600672057, guid: fc169414b3a5341e9a0b1241daa48455, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -208,7 +208,7 @@ LineRenderer:
   - {x: 1, y: 0, z: 0}
   m_Parameters:
     serializedVersion: 3
-    widthMultiplier: 0.04
+    widthMultiplier: 0.1
     widthCurve:
       serializedVersion: 2
       m_Curve:
@@ -226,8 +226,8 @@ LineRenderer:
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 1}
-      key1: {r: 1, g: 1, b: 1, a: 1}
+      key0: {r: 0.29019608, g: 0.98039216, b: 0.21568628, a: 1}
+      key1: {r: 0.29019608, g: 0.98039216, b: 0.21568628, a: 1}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
