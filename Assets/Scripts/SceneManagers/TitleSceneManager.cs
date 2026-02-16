@@ -24,7 +24,7 @@ namespace SceneManagers
 
         private void Awake()
         {
-            _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+            _demoConfig = DemoConfiguration.Load();
             _navigateAction = InputSystem.actions.FindAction("Navigate");
             _startHighlighter = startButton.GetComponent<Highlighter>();
             _quitHighlighter = quitButton.GetComponent<Highlighter>();

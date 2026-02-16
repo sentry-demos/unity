@@ -9,7 +9,7 @@ public class NotHotDogPickup : PickupBase
     
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
     }
 
     protected override void OnCollect(Player player)

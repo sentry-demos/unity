@@ -215,7 +215,7 @@ public class BattleSceneManager : MonoBehaviour
 
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
         
         InputSystem.actions.FindActionMap("Player").Enable();
         InputSystem.actions.FindActionMap("UI").Disable();

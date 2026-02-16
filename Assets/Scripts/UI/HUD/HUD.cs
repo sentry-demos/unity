@@ -24,7 +24,7 @@ public class HUD : MonoBehaviour
 
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
         
         // get score text component from child
         _scoreText = transform.Find("Score").GetComponent<TextMeshProUGUI>();

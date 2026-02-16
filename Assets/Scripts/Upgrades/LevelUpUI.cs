@@ -34,7 +34,7 @@ namespace Upgrades
 
         private void Awake()
         {
-            _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+            _demoConfig = DemoConfiguration.Load();
             _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
             
             _navigateAction = InputSystem.actions.FindAction("Navigate");

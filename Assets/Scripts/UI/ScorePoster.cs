@@ -33,7 +33,7 @@ public class ScorePoster : MonoBehaviour
 
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
         _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
 

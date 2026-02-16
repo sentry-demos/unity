@@ -16,15 +16,45 @@ public class DemoConfiguration : ScriptableObject
     [SerializeField] private bool _notHotDogParticleEffect;
     [SerializeField] private bool _fetchUpgradeFromServer;
     [SerializeField] private bool _crashOnGameOver;
-    
+
+    private bool _overridesApplied;
+
     public bool Enabled => _enabled;
     public string ApiUrl => _apiUrl;
     public User User => _user;
-    
+
     public bool AutoPlay => _enabled && _autoPlay;
     public bool NotHotDogParticleEffect => _enabled && _notHotDogParticleEffect;
     public bool FetchUpgradeFromServer => _enabled && _fetchUpgradeFromServer;
     public bool CrashOnGameOver => _enabled && _crashOnGameOver;
+
+    public void ApplyRuntimeOverrides()
+    {
+        if (_overridesApplied)
+            return;
+        _overridesApplied = true;
+
+        if (ArgumentReader.HasCommandLineFlag("demo"))
+        {
+            _enabled = true;
+            _autoPlay = true;
+            _crashOnGameOver = true;
+            _notHotDogParticleEffect = true;
+            _fetchUpgradeFromServer = true;
+        }
+    }
+
+    private static DemoConfiguration _instance;
+
+    public static DemoConfiguration Load()
+    {
+        if (_instance == null)
+        {
+            _instance = Resources.Load("DemoConfig") as DemoConfiguration;
+            _instance?.ApplyRuntimeOverrides();
+        }
+        return _instance;
+    }
 }
 
 [Serializable]

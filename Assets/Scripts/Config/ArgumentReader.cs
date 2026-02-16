@@ -14,4 +14,15 @@ public static class ArgumentReader
       }
       return null;
   }
+
+  public static bool HasCommandLineFlag(string name)
+  {
+      var args = Environment.GetCommandLineArgs();
+      for (var i = 0; i < args.Length; i++)
+      {
+          if (args[i] == "-" + name)
+              return true;
+      }
+      return false;
+  }
 }

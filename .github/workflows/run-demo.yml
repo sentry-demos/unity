@@ -53,7 +53,7 @@ jobs:
             Write-Output "Found executable: $($exePath.FullName)"
             $startTime = Get-Date
             
-            Start-Process -FilePath $exePath -Wait -PassThru -NoNewWindow
+            Start-Process -FilePath $exePath -ArgumentList "-demo" -Wait -PassThru -NoNewWindow
             
             $endTime = Get-Date
             $duration = $endTime - $startTime

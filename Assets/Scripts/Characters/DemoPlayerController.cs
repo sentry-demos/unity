@@ -15,7 +15,7 @@ namespace Characters
 
         private void Awake()
         {
-            _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+            _demoConfig = DemoConfiguration.Load();
         }
 
         private void OnEnable()
