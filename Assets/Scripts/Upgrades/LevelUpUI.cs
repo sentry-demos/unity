@@ -49,6 +49,10 @@ namespace Upgrades
             InputSystem.actions.FindActionMap("Player").Disable();
             InputSystem.actions.FindActionMap("UI").Enable();
             
+            // Subscribe to input events
+            _navigateAction.performed += OnNavigatePerformed;
+            _submitAction.performed += OnSubmitPerformed;
+            
             // Pause the game
             Time.timeScale = 0;
 
@@ -75,6 +79,9 @@ namespace Upgrades
 
             _option1Button.onClick.AddListener(() => SelectUpgrade(upgradeChoice1));
             _option2Button.onClick.AddListener(() => SelectUpgrade(upgradeChoice2));
+            
+            // Set initial highlighted button to option 1
+            SetHighlightedButton(_option1Button);
 
             if (_demoConfig != null && _demoConfig.AutoPlay)
             {
@@ -107,19 +114,14 @@ namespace Upgrades
             _highlightedButton?.GetComponent<Button>().onClick.Invoke();
         }
         
-        public void OnNavigate()
+        private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
             if (!gameObject.activeSelf)
             {
                 return;
             }
             
-            if (!_navigateAction.WasPressedThisFrame())
-            {
-                return;
-            }
-            
-            var direction = _navigateAction.ReadValue<Vector2>();
+            var direction = context.ReadValue<Vector2>();
             if (direction.x < 0)
             {
                 SetHighlightedButton(_option1Button);
@@ -130,19 +132,14 @@ namespace Upgrades
             }
         }
         
-        public void OnSubmit()
+        private void OnSubmitPerformed(InputAction.CallbackContext context)
         {
             if (!gameObject.activeSelf)
             {
                 return;
             }
             
-            if (!_submitAction.IsPressed())
-            {
-                return;
-            }
-            
-            _highlightedButton?.GetComponent<Button>().onClick.Invoke();
+            _highlightedButton?.onClick.Invoke();
         }
 
         public void SetHighlightedButton(Button button)
@@ -156,6 +153,10 @@ namespace Upgrades
 
         private void OnDisable()
         {
+            // Unsubscribe from input events
+            _navigateAction.performed -= OnNavigatePerformed;
+            _submitAction.performed -= OnSubmitPerformed;
+            
             _option1Button.onClick.RemoveAllListeners();
             _option2Button.onClick.RemoveAllListeners();
         }
