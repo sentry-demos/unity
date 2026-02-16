@@ -209,7 +209,7 @@
                 {
                     "name": "",
                     "id": "516ec204-3b9e-43d6-b1fe-a3b649c01b88",
-                    "path": "<GXDKGamepad>/select",
+                    "path": "<GXDKGamepad>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -231,7 +231,29 @@
                 {
                     "name": "",
                     "id": "a57c8beb-ff4b-48af-b12b-39a9b69277f8",
-                    "path": "<XInputController>/select",
+                    "path": "<XInputController>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f6a",
+                    "path": "<DualShockGamepad>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6e",
+                    "path": "<SwitchProControllerHID>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -723,7 +745,7 @@
                 {
                     "name": "",
                     "id": "4f2f6db6-f487-4f7b-819c-50fda21f90d7",
-                    "path": "<GXDKGamepad>/select",
+                    "path": "<GXDKGamepad>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -745,7 +767,29 @@
                 {
                     "name": "",
                     "id": "2b76180b-bc1b-4768-ae01-060e98b1d64a",
-                    "path": "<XInputController>/select",
+                    "path": "<XInputController>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b",
+                    "path": "<DualShockGamepad>/start",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Gamepad",
+                    "action": "Pause",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7f",
+                    "path": "<SwitchProControllerHID>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -760,6 +804,17 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse;Gamepad;Touch;Joystick;XR",
+                    "action": "Submit",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
                     "action": "Submit",
                     "isComposite": false,
                     "isPartOfComposite": false
