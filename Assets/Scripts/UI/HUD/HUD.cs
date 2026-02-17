@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using SceneManagers;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,13 +17,14 @@ public class HUD : MonoBehaviour
     [SerializeField] private ScorePoster _scorePoster;
     [SerializeField] private GameObject _tryAgain;
     [SerializeField] private GameObject _quit;
+    [SerializeField] private HUDManager _hudManager;
 
     private DemoConfiguration _demoConfig;
     private XpBar _xpBar;
 
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
         
         // get score text component from child
         _scoreText = transform.Find("Score").GetComponent<TextMeshProUGUI>();
@@ -78,6 +80,12 @@ public class HUD : MonoBehaviour
         _gameOverText.enabled = false;
         _tryAgain.SetActive(false);
         _quit.SetActive(false);
+        
+        // Clear the highlighted button to prevent accidental clicks
+        if (_hudManager != null)
+        {
+            _hudManager.ClearHighlightedButton();
+        }
     }
 
     public void ShowGameOver()

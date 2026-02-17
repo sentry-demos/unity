@@ -23,11 +23,19 @@ namespace SceneManagers
             _navigateAction = InputSystem.actions.FindAction("Navigate");
             _submitAction = InputSystem.actions.FindAction("Submit");
             
-            // Subscribe to the performed callback only
+            // Subscribe to input events
+            _navigateAction.performed += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
             
             _tryAgainHighlighter = tryAgainButton.GetComponent<Highlighter>();
             _quitHighlighter = quitButton.GetComponent<Highlighter>();
+        }
+        
+        private void OnDestroy()
+        {
+            // Unsubscribe from input events
+            _navigateAction.performed -= OnNavigatePerformed;
+            _submitAction.performed -= OnSubmitPerformed;
         }
 
         private void OnSubmitPerformed(InputAction.CallbackContext context)
@@ -37,10 +45,14 @@ namespace SceneManagers
                 return;
             }
             
-            _highlightedButton?.GetComponent<Button>().onClick.Invoke();
+            // Only invoke if the highlighted button is actually active
+            if (_highlightedButton != null && _highlightedButton.activeSelf)
+            {
+                _highlightedButton.GetComponent<Button>().onClick.Invoke();
+            }
         }
 
-        public void OnNavigate()
+        private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
             if (!gameObject.activeSelf)
             {
@@ -52,12 +64,7 @@ namespace SceneManagers
                 return;
             }
 
-            if (!_navigateAction.WasPressedThisFrame())
-            {
-                return;
-            }
-
-            var direction = _navigateAction.ReadValue<Vector2>();
+            var direction = context.ReadValue<Vector2>();
             
             // Simple navigation between try again and quit buttons
             if (_highlightedButton == null)
@@ -91,6 +98,13 @@ namespace SceneManagers
         
             highlighted.Highlight();
             _highlightedButton = highlighted.gameObject;
+        }
+        
+        public void ClearHighlightedButton()
+        {
+            _tryAgainHighlighter.Highlight(false);
+            _quitHighlighter.Highlight(false);
+            _highlightedButton = null;
         }
     }
 }

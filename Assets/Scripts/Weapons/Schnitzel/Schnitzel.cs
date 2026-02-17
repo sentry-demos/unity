@@ -62,22 +62,24 @@ public class Schnitzel : WeaponBase
 
     private Vector3 CalculateDirection(GameObject player)
     {
-        if (Gamepad.current != null)
+        // Use gamepad right stick if it's actively being used
+        var stickDirection = _lookAction.ReadValue<Vector2>();
+        if (stickDirection.magnitude >= 0.1f)
         {
-            var direction = _lookAction.ReadValue<Vector2>(); 
-            if (direction.magnitude < 0.1f)
-            {
-                // Don't change it if we're not aiming
-                return _shootingDirection;
-            }
-
-            return direction;
+            return stickDirection;
         }
-        
-        var mousePosition = Camera.main.ScreenToWorldPoint(_mouseAction.ReadValue<Vector2>());
-        var targetDirection = mousePosition - player.transform.position;
-        
-        return targetDirection;
+
+        // On desktop, fall through to mouse aiming
+        if (Application.platform != RuntimePlatform.Android &&
+            Application.platform != RuntimePlatform.IPhonePlayer)
+        {
+            var mousePosition = Camera.main.ScreenToWorldPoint(_mouseAction.ReadValue<Vector2>());
+            var targetDirection = mousePosition - player.transform.position;
+            return targetDirection;
+        }
+
+        // On mobile with no stick input, keep current direction
+        return _shootingDirection;
     }
 
     private void ShootOneSchnitzel(SchnitzelProjectile prefab, GameObject player, Vector3 direction)

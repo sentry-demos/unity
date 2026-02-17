@@ -215,7 +215,7 @@ public class BattleSceneManager : MonoBehaviour
 
     private void Awake()
     {
-        _demoConfig = Resources.Load("DemoConfig") as DemoConfiguration;
+        _demoConfig = DemoConfiguration.Load();
         
         InputSystem.actions.FindActionMap("Player").Enable();
         InputSystem.actions.FindActionMap("UI").Disable();
@@ -463,6 +463,12 @@ public class BattleSceneManager : MonoBehaviour
 
     public void OnPause()
     {
+        // Don't allow pausing if the level up UI is active (it already pauses the game)
+        if (_levelUpUI.activeSelf)
+        {
+            return;
+        }
+        
         if (_gameState == GameState.Playing)
         {
             PauseGame();
