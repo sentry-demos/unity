@@ -45,6 +45,9 @@ public class HUD : MonoBehaviour
         {
             EventManager.TriggerEvent("Quit");
         });
+
+        if (_hudManager == null)
+            _hudManager = FindObjectOfType<HUDManager>();
     }
 
     private void Update()
@@ -92,10 +95,13 @@ public class HUD : MonoBehaviour
     {
         _gameOverText.text = "GAME OVER";
         _gameOverText.enabled = true;
-        
+
         _quit.SetActive(true);
         _tryAgain.SetActive(true);
         _scorePoster.Enable();
+
+        // Pre-select the name field so the player can immediately navigate with a controller
+        _hudManager?.FocusNameField();
     }
 
     public void SetCurrentLevel(int level)

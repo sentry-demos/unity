@@ -35,6 +35,9 @@ public class ScorePoster : MonoBehaviour
     private BattleSceneManager _gameManager;
     private TextMeshProUGUI _buttonText;
 
+    public TMP_InputField NameField => _nameField;
+    public Button SubmitButton => _submitButton;
+
     private string _jwtToken;
 #if !UNITY_SWITCH
     private HttpClient _httpClient;
@@ -42,6 +45,8 @@ public class ScorePoster : MonoBehaviour
 
     private TouchScreenKeyboard _keyboard;
     private bool _keyboardWasActive = false;
+    private bool _submitted = false;
+    private string _savedName = "";
 
 #if UNITY_STANDALONE_WIN
     [DllImport("HandheldHelper")] private static extern bool ShowVirtualKeyboard();
@@ -56,6 +61,9 @@ public class ScorePoster : MonoBehaviour
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
 
         _submitButton.onClick.AddListener(OnSubmit);
+        _submitButton.interactable = false;
+        _nameField.onValueChanged.AddListener(OnNameValueChanged);
+        _nameField.onEndEdit.AddListener(OnNameEndEdit);
 
         // Configure input field for touch devices
         // For devices with touch keyboards (mobile, Switch, Windows tablets):
@@ -95,9 +103,31 @@ public class ScorePoster : MonoBehaviour
         if (_nameField != null)
         {
             _nameField.onSelect.RemoveListener(OnInputFieldSelected);
+            _nameField.onValueChanged.RemoveListener(OnNameValueChanged);
+            _nameField.onEndEdit.RemoveListener(OnNameEndEdit);
 #if UNITY_STANDALONE_WIN
             _nameField.onDeselect.RemoveListener(OnInputFieldDeselected);
 #endif
+        }
+    }
+
+    private void OnNameValueChanged(string text)
+    {
+        if (_submitted) return;
+        if (!string.IsNullOrEmpty(text))
+            _savedName = text;
+        _submitButton.interactable = !string.IsNullOrEmpty(text);
+    }
+
+    private void OnNameEndEdit(string text)
+    {
+        if (_submitted) return;
+        // TMP_InputField reverts to m_OriginalText when the user presses ESC/Cancel.
+        // If the field is now empty but we have a previously typed name, restore it.
+        if (string.IsNullOrEmpty(text) && !string.IsNullOrEmpty(_savedName))
+        {
+            _nameField.SetTextWithoutNotify(_savedName);
+            _submitButton.interactable = true;
         }
     }
 
@@ -118,6 +148,7 @@ public class ScorePoster : MonoBehaviour
         if (_jwtToken != null)
         {
             _root.SetActive(true);
+            _submitButton.interactable = !string.IsNullOrEmpty(_nameField.text);
         }
     }
 
@@ -293,6 +324,9 @@ public class ScorePoster : MonoBehaviour
 
     private void OnSubmit()
     {
+        // Disable immediately to prevent a second submission while the request is in-flight.
+        // Re-enabled only on failure so the player can retry.
+        _submitButton.interactable = false;
         _ = UploadScoreAsync();
     }
 
@@ -359,6 +393,7 @@ public class ScorePoster : MonoBehaviour
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     Debug.Log("Uploading score to leaderboard failed.");
+                    _submitButton.interactable = true;
                     _buttonText.text = "Retry";
 
                     // Finish span with error status
@@ -377,8 +412,10 @@ public class ScorePoster : MonoBehaviour
                 else
                 {
                     Debug.Log("Uploading score to leaderboard was successful.");
+                    _submitted = true;
                     _submitButton.interactable = false;
                     _buttonText.text = "Posted!";
+                    _nameField.interactable = false;
 
                     // Finish span with success status
                     span?.SetExtra("http.response.status_code", statusCode);
@@ -396,14 +433,17 @@ public class ScorePoster : MonoBehaviour
             {
                 Debug.Log("Uploading score to leaderboard failed.");
                 SentrySdk.CaptureException(new HttpRequestException("Failed to upload score."));
+                _submitButton.interactable = true;
                 _buttonText.text = "Retry";
                 uploadTransaction.Finish(SpanStatus.Unavailable);
             }
             else
             {
                 Debug.Log("Uploading score to leaderboard was successful.");
+                _submitted = true;
                 _submitButton.interactable = false;
                 _buttonText.text = "Posted!";
+                _nameField.interactable = false;
                 uploadTransaction.Finish(SpanStatus.Ok);
             }
 #endif
@@ -411,6 +451,7 @@ public class ScorePoster : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"Score upload failed: {ex.Message}");
+            _submitButton.interactable = true;
             _buttonText.text = "Retry";
             uploadTransaction.Finish(SpanStatus.InternalError);
         }
