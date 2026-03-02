@@ -44,6 +44,8 @@ public class ScorePoster : MonoBehaviour
     private HttpClient _httpClient;
 #endif
 
+    public event Action OnVirtualKeyboardClosedWithText;
+
     private TouchScreenKeyboard _keyboard;
     private bool _keyboardWasActive = false;
     private bool _submitted = false;
@@ -169,6 +171,8 @@ public class ScorePoster : MonoBehaviour
                 _nameField.text = _keyboard.text;
             }
             _keyboardWasActive = false;
+            if (!string.IsNullOrEmpty(_nameField.text))
+                OnVirtualKeyboardClosedWithText?.Invoke();
         }
     }
 
@@ -216,6 +220,8 @@ public class ScorePoster : MonoBehaviour
         {
             Debug.LogWarning($"Failed to hide virtual keyboard: {ex.Message}");
         }
+        if (!string.IsNullOrEmpty(_nameField.text))
+            OnVirtualKeyboardClosedWithText?.Invoke();
     }
 #endif
 

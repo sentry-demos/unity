@@ -60,6 +60,7 @@ namespace SceneManagers
             {
                 _nameField = _scorePoster.NameField;
                 _submitButton = _scorePoster.SubmitButton;
+                _scorePoster.OnVirtualKeyboardClosedWithText += OnVirtualKeyboardClosedWithText;
                 // Capture the highlight color from the navigation buttons for direct tweening.
                 _submitHighlightColor = tryAgainButton.GetComponent<Button>().colors.highlightedColor;
                 _submitGraphic = _submitButton.targetGraphic != null
@@ -77,6 +78,9 @@ namespace SceneManagers
             // Unsubscribe from input events
             _navigateAction.performed -= OnNavigatePerformed;
             _submitAction.performed -= OnSubmitPerformed;
+
+            if (_scorePoster != null)
+                _scorePoster.OnVirtualKeyboardClosedWithText -= OnVirtualKeyboardClosedWithText;
 
             _nameFieldTween?.Kill();
             _submitColorTween?.Kill();
@@ -238,6 +242,15 @@ namespace SceneManagers
             {
                 // Navigate from try again to quit
                 SetHighlightedButton(_quitHighlighter);
+            }
+        }
+
+        private void OnVirtualKeyboardClosedWithText()
+        {
+            if (_submitButton != null && _submitButton.interactable
+                && _submitHighlighter != null && _submitHighlighter.isActiveAndEnabled)
+            {
+                SetHighlightedButton(_submitHighlighter);
             }
         }
 
