@@ -246,6 +246,17 @@ public class BattleSceneManager : MonoBehaviour
 
         _gameStartTime = Time.time;
 
+        var forceCrashAction = InputSystem.actions.FindAction("ForceCrash");
+        if (forceCrashAction != null)
+        {
+            // WARNING, this also crashes in the Editor (on purpose, to easily test)
+            forceCrashAction.performed += _ =>
+            {
+                Debug.Log("ForceCrash triggered via input.");
+                Utils.ForceCrash(ForcedCrashCategory.FatalError);
+            };
+        }
+
         SetCurrentLevel(_currentLevel);
 
         EventManager.AddListener(
