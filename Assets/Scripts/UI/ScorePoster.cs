@@ -37,6 +37,7 @@ public class ScorePoster : MonoBehaviour
 
     public TMP_InputField NameField => _nameField;
     public Button SubmitButton => _submitButton;
+    public Transform Root => _root != null ? _root.transform : transform;
 
     private string _jwtToken;
 #if !UNITY_SWITCH
