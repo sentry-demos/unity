@@ -253,7 +253,7 @@ public class BattleSceneManager : MonoBehaviour
             forceCrashAction.performed += _ =>
             {
                 Debug.Log("ForceCrash triggered via input.");
-                Utils.ForceCrash(ForcedCrashCategory.FatalError);
+                Marshal.ReadInt32(IntPtr.Zero); // null pointer dereference — works on all platforms
             };
         }
 
