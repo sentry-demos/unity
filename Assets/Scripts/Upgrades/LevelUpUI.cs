@@ -50,7 +50,7 @@ namespace Upgrades
             InputSystem.actions.FindActionMap("UI").Enable();
             
             // Subscribe to input events
-            _navigateAction.performed += OnNavigatePerformed;
+            _navigateAction.started += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
             
             // Pause the game
@@ -154,7 +154,7 @@ namespace Upgrades
         private void OnDisable()
         {
             // Unsubscribe from input events
-            _navigateAction.performed -= OnNavigatePerformed;
+            _navigateAction.started -= OnNavigatePerformed;
             _submitAction.performed -= OnSubmitPerformed;
             
             _option1Button.onClick.RemoveAllListeners();
