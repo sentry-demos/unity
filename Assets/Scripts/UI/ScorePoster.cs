@@ -16,6 +16,7 @@ public class ScoreEntry
     public string Duration;
     public int Score;
     public string Timestamp;
+    public string Platform;
 }
 
 public class ScorePoster : MonoBehaviour
@@ -104,7 +105,8 @@ public class ScorePoster : MonoBehaviour
             Name = _nameField.text,
             Duration = TimeSpan.FromSeconds(Time.timeSinceLevelLoad).ToString(),
             Score = _gameManager.GetScore(),
-            Timestamp = DateTime.Now.ToString("o")
+            Timestamp = DateTime.Now.ToString("o"),
+            Platform = Application.platform.ToString()
         };
 
         var json = JsonUtility.ToJson(score);
