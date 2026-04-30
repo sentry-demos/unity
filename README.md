@@ -52,7 +52,7 @@ See [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Leaderboard / Top 10
 
-Live leaderboard: http://sentaur-survivor.com ([repo](https://github.com/sentry-demos/sentaur-leaderboard))
+Live leaderboard: http://sentaur-survivors.com ([repo](https://github.com/sentry-demos/sentaur-leaderboard))
 
 ## Credits
 
