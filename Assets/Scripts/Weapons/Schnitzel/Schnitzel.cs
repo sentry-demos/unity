@@ -24,6 +24,7 @@ public class Schnitzel : WeaponBase
     private SchnitzelProjectile _schnitzelProjectilePrefab;
 
     private Vector3 _shootingDirection = Vector3.right;
+    private Vector3 _lastStickDirection = Vector3.zero;
     
     private void Awake()
     {
@@ -66,7 +67,14 @@ public class Schnitzel : WeaponBase
         var stickDirection = _lookAction.ReadValue<Vector2>();
         if (stickDirection.magnitude >= 0.1f)
         {
+            _lastStickDirection = stickDirection;
             return stickDirection;
+        }
+
+        // If stick was previously used, keep that direction instead of snapping back
+        if (_lastStickDirection != Vector3.zero)
+        {
+            return _lastStickDirection;
         }
 
         // On desktop, fall through to mouse aiming

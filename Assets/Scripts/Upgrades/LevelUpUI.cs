@@ -31,6 +31,7 @@ namespace Upgrades
         private Button _option1Button;
         private Button _option2Button;
         private Button _highlightedButton;
+        private int _lastNavZone = 0; // -1 = left, 0 = neutral, 1 = right
 
         private void Awake()
         {
@@ -50,6 +51,7 @@ namespace Upgrades
             InputSystem.actions.FindActionMap("UI").Enable();
             
             // Subscribe to input events
+            _lastNavZone = 0;
             _navigateAction.performed += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
             
@@ -116,20 +118,18 @@ namespace Upgrades
         
         private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
-            if (!gameObject.activeSelf)
-            {
-                return;
-            }
-            
+            if (!gameObject.activeSelf) return;
+
             var direction = context.ReadValue<Vector2>();
-            if (direction.x < 0)
-            {
+            int zone = direction.x < -0.5f ? -1 : direction.x > 0.5f ? 1 : 0;
+
+            if (zone == _lastNavZone) return; // no zone change, skip
+            _lastNavZone = zone;
+
+            if (zone == -1)
                 SetHighlightedButton(_option1Button);
-            }
-            else if (direction.x > 0)
-            {
+            else if (zone == 1)
                 SetHighlightedButton(_option2Button);
-            }
         }
         
         private void OnSubmitPerformed(InputAction.CallbackContext context)

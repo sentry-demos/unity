@@ -32,6 +32,8 @@ namespace SceneManagers
 
         private void Start()
         {
+            SetHighlightedButton(_startHighlighter);
+
             if (_demoConfig != null && _demoConfig.AutoPlay)
             {
                 StartCoroutine(AutoStartGame());

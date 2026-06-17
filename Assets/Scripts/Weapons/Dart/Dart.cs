@@ -30,6 +30,7 @@ public class Dart : WeaponBase
     private DartProjectile _dartProjectilePrefab;
 
     private Vector3 _shootingDirection = Vector3.right;
+    private Vector3 _lastStickDirection = Vector3.zero;
     private Arrow _arrow;
 
     // Override mechanism for external shooting direction control
@@ -163,7 +164,14 @@ public class Dart : WeaponBase
         var stickDirection = _lookAction.ReadValue<Vector2>();
         if (stickDirection.magnitude >= 0.1f)
         {
+            _lastStickDirection = stickDirection;
             return stickDirection;
+        }
+
+        // If stick was previously used, keep that direction instead of snapping back
+        if (_lastStickDirection != Vector3.zero)
+        {
+            return _lastStickDirection;
         }
 
         // On desktop, fall through to mouse aiming
