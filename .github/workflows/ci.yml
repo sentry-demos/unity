@@ -19,28 +19,14 @@ jobs:
           access_token: ${{ github.token }}
 
   build:
-    name: Build for ${{ matrix.targetPlatform }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - targetPlatform: StandaloneWindows64
-            os: windows-2022
-          - targetPlatform: Android
-            os: ubuntu-latest
-    
-    steps:
-      - name: Free disk space # Android builds runs out of disk space otherwise
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          df -h
+    name: Build Windows
+    runs-on: windows-2022
+    env:
+      UNITY_CLI_VERSION: 1.0.0-beta.3
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
 
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -48,46 +34,115 @@ jobs:
           lfs: true
 
       - name: Set Unity Version
-        shell: bash
+        shell: pwsh
         run: |
-          UNITY_VERSION=$(grep 'm_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')
-          echo "UNITY_VERSION=$UNITY_VERSION" >> $GITHUB_ENV
+          $version = (Get-Content ProjectSettings/ProjectVersion.txt | Where-Object { $_ -match '^m_EditorVersion:' }).Split(':')[1].Trim()
+          "UNITY_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Install Unity CLI
+        shell: pwsh
+        run: |
+          $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
+          & ([scriptblock]::Create($installer)) -Target "$env:UNITY_CLI_VERSION" -Channel beta
+          "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
+
+      - name: Verify Unity CLI
+        shell: pwsh
+        run: |
+          $version = (unity --version).Trim()
+          if ($version -ne $env:UNITY_CLI_VERSION) {
+            throw "Expected Unity CLI $env:UNITY_CLI_VERSION, found $version."
+          }
+
+      - name: Set Unity Editor install path
+        shell: pwsh
+        run: |
+          $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
+          "UNITY_EDITOR_PATH=$editorPath" >> $env:GITHUB_ENV
+          unity install-path --set "$editorPath" --non-interactive
+
+      - name: Cache Unity Editor
+        id: cache-unity-editor
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/unity-editors
+          key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-windows-il2cpp
+
+      - name: Register cached Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: unity editors add (Join-Path $env:UNITY_EDITOR_PATH $env:UNITY_VERSION)
+
+      - name: Install Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
 
       - name: Cache Unity Library
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
+          key: Library-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-
-            Library-${{ matrix.targetPlatform }}-
+            Library-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-
 
-      - name: Cache Build Output
-        uses: actions/cache@v4
-        id: cache-build
-        with:
-          path: build
-          key: build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            build-${{ matrix.targetPlatform }}-
+      - name: Configure Unity license server
+        shell: pwsh
+        env:
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:LICENSE_SERVER_URL)) {
+            throw 'LICENSE_SERVER_URL is required for Unity floating licenses.'
+          }
 
-      - run: echo "::add-mask::${{ secrets.LICENSE_SERVER_URL }}"
+          $configDirectory = Join-Path $env:ProgramData 'Unity/config'
+          New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+          @{
+            licensingServiceBaseUrl = $env:LICENSE_SERVER_URL
+            enableEntitlementLicensing = $true
+            enableFloatingApi = $true
+            clientConnectTimeoutSec = 5
+            clientHandshakeTimeoutSec = 10
+          } | ConvertTo-Json | Set-Content -Path (Join-Path $configDirectory 'services-config.json')
 
-      - uses: game-ci/unity-builder@v4
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-          targetPlatform: ${{ matrix.targetPlatform }}
-          unityLicensingServer: ${{ secrets.LICENSE_SERVER_URL }}
-          buildName: SentaurSurvivors-${{ matrix.targetPlatform }}
-          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }} # Arguments cannot be passed via ENV
-          allowDirtyBuild: true
+      - name: Acquire Unity floating license
+        shell: pwsh
+        run: |
+          unity license server status --format json
+          unity license activate --floating --non-interactive
+
+      - name: Build Windows player
+        shell: pwsh
+        env:
+          DSN: ${{ secrets.DSN }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        run: |
+          unity build . `
+            --target StandaloneWindows64 `
+            --execute-method Editor.GameBuilder.Build `
+            --output-path build/StandaloneWindows64/SentaurSurvivors.exe `
+            --editor-version "$env:UNITY_VERSION" `
+            --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
+            --no-tail `
+            --non-interactive
+
+      - name: Return Unity floating license
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          if (Get-Command unity -ErrorAction SilentlyContinue) {
+            unity license return --yes --non-interactive
+          }
+
+          $configPath = Join-Path $env:ProgramData 'Unity/config/services-config.json'
+          Remove-Item -Path $configPath -Force -ErrorAction SilentlyContinue
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: SentaurSurvivors-${{ matrix.targetPlatform }}
+          name: SentaurSurvivors-StandaloneWindows64
           path: build
           retention-days: 90
 
