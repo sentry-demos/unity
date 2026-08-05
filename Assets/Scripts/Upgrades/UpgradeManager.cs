@@ -1,12 +1,10 @@
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Sentry;
 using UnityEngine;
 
 class UpgradeManager : MonoBehaviour
 {
     List<UpgradePathBase> _availableUpgrades = new List<UpgradePathBase>();
-    BattleSceneManager _gameManager;
 
     private static UpgradeManager _instance;
 
@@ -25,7 +23,6 @@ class UpgradeManager : MonoBehaviour
     public void Awake()
     {
         _availableUpgrades.AddRange(GetComponentsInChildren<UpgradePathBase>());
-        _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
 
         // dart starts at level 1
         GetComponentInChildren<DartUpgradePath>()
