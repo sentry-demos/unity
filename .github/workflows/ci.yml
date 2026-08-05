@@ -121,7 +121,7 @@ jobs:
           unity build . `
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
-            --output-path build/StandaloneWindows64/SentaurSurvivors.exe `
+            --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
             --editor-version "$env:UNITY_VERSION" `
             --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
             --no-tail `
