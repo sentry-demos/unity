@@ -142,7 +142,7 @@ jobs:
 
   build-linux:
     name: Build Linux and Android
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       UNITY_CLI_VERSION: 1.0.0-beta.3
       UNITY_NO_CONSENT_PROMPT: 1
@@ -228,8 +228,8 @@ jobs:
       - name: Acquire Unity floating license
         shell: bash
         run: |
-          unity license server status --format json
-          unity license activate --floating --non-interactive
+          unity license server status --format json || true
+          unity license activate --floating --format json --non-interactive
 
       - name: Build Linux player
         shell: bash
