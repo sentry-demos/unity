@@ -76,9 +76,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-
+          key: Library-v2-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
       - name: Configure Unity license server
         shell: pwsh
@@ -117,7 +115,6 @@ jobs:
             --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
             --editor-version "$env:UNITY_VERSION" `
             --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
-            --no-tail `
             --non-interactive
 
       - name: Return Unity floating license
@@ -203,8 +200,6 @@ jobs:
         with:
           path: Library
           key: Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-
 
       - name: Configure Unity license server
         shell: bash
