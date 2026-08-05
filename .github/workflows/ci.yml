@@ -140,9 +140,157 @@ jobs:
           path: build
           retention-days: 90
 
+  build-linux:
+    name: Build Linux and Android
+    runs-on: ubuntu-latest
+    env:
+      UNITY_CLI_VERSION: 1.0.0-beta.3
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set Unity Version
+        shell: bash
+        run: |
+          unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
+          printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
+
+      - name: Install Unity CLI
+        shell: bash
+        env:
+          UNITY_CLI_CHANNEL: beta
+        run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
+
+      - name: Add Unity CLI to PATH
+        shell: bash
+        run: printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Unity CLI
+        shell: bash
+        run: |
+          version=$(unity --version)
+          if [ "$version" != "$UNITY_CLI_VERSION" ]; then
+            printf 'Expected Unity CLI %s, found %s.\n' "$UNITY_CLI_VERSION" "$version" >&2
+            exit 1
+          fi
+
+      - name: Set Unity Editor install path
+        shell: bash
+        run: |
+          editor_path="$RUNNER_TEMP/unity-editors"
+          mkdir -p "$editor_path"
+          printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
+          unity install-path --set "$editor_path" --non-interactive
+
+      - name: Cache Unity downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/UnityHub/downloads
+          key: UnityDownloads-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-linux-il2cpp-android
+
+      - name: Install Unity Editor
+        shell: bash
+        run: unity install "$UNITY_VERSION" --module linux-il2cpp --module android --childModules --accept-eula --yes --non-interactive
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-
+
+      - name: Configure Unity license server
+        shell: bash
+        env:
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+        run: |
+          if [ -z "$LICENSE_SERVER_URL" ]; then
+            printf '%s\n' 'LICENSE_SERVER_URL is required for Unity floating licenses.' >&2
+            exit 1
+          fi
+
+          sudo install -d /etc/Unity/config
+          jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
+            licensingServiceBaseUrl: $licensing_service_base_url,
+            enableEntitlementLicensing: true,
+            enableFloatingApi: true,
+            clientConnectTimeoutSec: 5,
+            clientHandshakeTimeoutSec: 10
+          }' | sudo tee /etc/Unity/config/services-config.json > /dev/null
+
+      - name: Acquire Unity floating license
+        shell: bash
+        run: |
+          unity license server status --format json
+          unity license activate --floating --non-interactive
+
+      - name: Build Linux player
+        shell: bash
+        env:
+          DSN: ${{ secrets.DSN }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        run: |
+          unity build . \
+            --target StandaloneLinux64 \
+            --execute-method Editor.GameBuilder.Build \
+            --output-path build/StandaloneLinux64/SentaurSurvivors-StandaloneLinux64 \
+            --editor-version "$UNITY_VERSION" \
+            --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
+            --no-tail \
+            --non-interactive
+
+      - name: Upload Linux Build Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SentaurSurvivors-StandaloneLinux64
+          path: build/StandaloneLinux64
+          retention-days: 90
+
+      - name: Build Android player
+        shell: bash
+        env:
+          DSN: ${{ secrets.DSN }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        run: |
+          unity build . \
+            --target Android \
+            --execute-method Editor.GameBuilder.Build \
+            --output-path build/Android/SentaurSurvivors-Android.apk \
+            --editor-version "$UNITY_VERSION" \
+            --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
+            --no-tail \
+            --non-interactive
+
+      - name: Upload Android Build Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SentaurSurvivors-Android
+          path: build/Android
+          retention-days: 90
+
+      - name: Return Unity floating license
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          if command -v unity > /dev/null; then
+            unity license return --yes --non-interactive
+          fi
+
+          sudo rm -f /etc/Unity/config/services-config.json
+
   run-demo:
     name: Run Demo
-    needs: [build]
+    needs: [build, build-linux]
     uses: ./.github/workflows/run-demo.yml
     secrets: inherit
     with:
