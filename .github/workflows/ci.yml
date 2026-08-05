@@ -216,14 +216,14 @@ jobs:
             exit 1
           fi
 
-          sudo install -d /etc/Unity/config
+          sudo install -d /usr/share/unity3d/config
           jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
             licensingServiceBaseUrl: $licensing_service_base_url,
             enableEntitlementLicensing: true,
             enableFloatingApi: true,
             clientConnectTimeoutSec: 5,
             clientHandshakeTimeoutSec: 10
-          }' | sudo tee /etc/Unity/config/services-config.json > /dev/null
+          }' | sudo tee /usr/share/unity3d/config/services-config.json > /dev/null
 
       - name: Acquire Unity floating license
         shell: bash
@@ -286,7 +286,7 @@ jobs:
             unity license return --yes --non-interactive
           fi
 
-          sudo rm -f /etc/Unity/config/services-config.json
+          sudo rm -f /usr/share/unity3d/config/services-config.json
 
   run-demo:
     name: Run Demo
