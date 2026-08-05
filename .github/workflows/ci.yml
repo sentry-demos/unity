@@ -69,15 +69,20 @@ jobs:
           path: ${{ runner.temp }}/unity-editors
           key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-windows-il2cpp
 
-      - name: Register cached Unity Editor
-        if: steps.cache-unity-editor.outputs.cache-hit == 'true'
-        shell: pwsh
-        run: unity editors add (Join-Path $env:UNITY_EDITOR_PATH "${env:UNITY_VERSION}-x86_64")
-
       - name: Install Unity Editor
         if: steps.cache-unity-editor.outputs.cache-hit != 'true'
         shell: pwsh
         run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
+
+      - name: Resolve Unity Editor
+        shell: pwsh
+        run: |
+          $editor = Get-ChildItem -Path $env:UNITY_EDITOR_PATH -Filter Unity.exe -File -Recurse | Select-Object -First 1
+          if ($null -eq $editor) {
+            throw "Unity.exe was not found under $env:UNITY_EDITOR_PATH."
+          }
+
+          "UNITY_EDITOR_BINARY=$($editor.FullName)" >> $env:GITHUB_ENV
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -122,7 +127,7 @@ jobs:
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
             --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
-            --editor-version "$env:UNITY_VERSION" `
+            --editor-path "$env:UNITY_EDITOR_BINARY" `
             --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
             --no-tail `
             --non-interactive
