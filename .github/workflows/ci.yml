@@ -58,6 +58,7 @@ jobs:
         shell: pwsh
         run: |
           $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
+          New-Item -ItemType Directory -Path $editorPath -Force | Out-Null
           "UNITY_EDITOR_PATH=$editorPath" >> $env:GITHUB_ENV
           unity install-path --set "$editorPath" --non-interactive
 
