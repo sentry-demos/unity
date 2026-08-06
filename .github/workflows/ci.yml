@@ -84,6 +84,11 @@ jobs:
 
           "UNITY_EDITOR_BINARY=$($editor.FullName)" >> $env:GITHUB_ENV
 
+      - name: Register cached Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit == 'true'
+        shell: pwsh
+        run: unity editors add (Split-Path (Split-Path $env:UNITY_EDITOR_BINARY -Parent) -Parent)
+
       - name: Save Unity Editor cache
         if: steps.cache-unity-editor.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -132,7 +137,7 @@ jobs:
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
             --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
-            --editor-path "$env:UNITY_EDITOR_BINARY" `
+            --editor-version "$env:UNITY_VERSION" `
             --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
             --non-interactive
 
@@ -147,6 +152,15 @@ jobs:
 
           $configPath = Join-Path $env:ProgramData 'Unity/config/services-config.json'
           Remove-Item -Path $configPath -Force -ErrorAction SilentlyContinue
+
+      - name: Upload Windows Unity Build Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SentaurSurvivors-Windows-UnityLogs
+          path: Logs/build-*.log
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -227,6 +241,11 @@ jobs:
 
           printf 'UNITY_EDITOR_BINARY=%s\n' "$editor" >> "$GITHUB_ENV"
 
+      - name: Register cached Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit == 'true'
+        shell: bash
+        run: unity editors add "$(dirname "$(dirname "$UNITY_EDITOR_BINARY")")"
+
       - name: Save Unity Editor cache
         if: steps.cache-unity-editor.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -275,7 +294,7 @@ jobs:
             --target StandaloneLinux64 \
             --execute-method Editor.GameBuilder.Build \
             --output-path build/StandaloneLinux64/SentaurSurvivors-StandaloneLinux64 \
-            --editor-path "$UNITY_EDITOR_BINARY" \
+            --editor-version "$UNITY_VERSION" \
             --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
             --no-tail \
             --non-interactive
@@ -298,7 +317,7 @@ jobs:
             --target Android \
             --execute-method Editor.GameBuilder.Build \
             --output-path build/Android/SentaurSurvivors-Android.apk \
-            --editor-path "$UNITY_EDITOR_BINARY" \
+            --editor-version "$UNITY_VERSION" \
             --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
             --no-tail \
             --non-interactive
@@ -321,6 +340,15 @@ jobs:
           fi
 
           sudo rm -f /usr/share/unity3d/config/services-config.json
+
+      - name: Upload Linux Unity Build Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SentaurSurvivors-Linux-UnityLogs
+          path: Logs/build-*.log
+          retention-days: 90
+          if-no-files-found: warn
 
   run-demo:
     name: Run Demo
