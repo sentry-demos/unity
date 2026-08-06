@@ -62,15 +62,34 @@ jobs:
           "UNITY_EDITOR_PATH=$editorPath" >> $env:GITHUB_ENV
           unity install-path --set "$editorPath" --non-interactive
 
-      - name: Cache Unity downloads
-        uses: actions/cache@v4
+      - name: Restore Unity Editor cache
+        id: cache-unity-editor
+        uses: actions/cache/restore@v4
         with:
-          path: ~\AppData\Roaming\UnityHub\downloads
-          key: UnityDownloads-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-windows-il2cpp
+          path: ${{ runner.temp }}/unity-editors
+          key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-windows-il2cpp
 
       - name: Install Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit != 'true'
         shell: pwsh
         run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
+
+      - name: Resolve Unity Editor
+        shell: pwsh
+        run: |
+          $editor = Get-ChildItem -Path $env:UNITY_EDITOR_PATH -Filter Unity.exe -File -Recurse | Select-Object -First 1
+          if ($null -eq $editor) {
+            throw "Unity.exe was not found under $env:UNITY_EDITOR_PATH."
+          }
+
+          "UNITY_EDITOR_BINARY=$($editor.FullName)" >> $env:GITHUB_ENV
+
+      - name: Save Unity Editor cache
+        if: steps.cache-unity-editor.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/unity-editors
+          key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-windows-il2cpp
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -113,7 +132,7 @@ jobs:
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
             --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
-            --editor-version "$env:UNITY_VERSION" `
+            --editor-path "$env:UNITY_EDITOR_BINARY" `
             --args "-dsn $env:DSN -auth_token $env:AUTH_TOKEN" `
             --non-interactive
 
@@ -185,15 +204,35 @@ jobs:
           printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
           unity install-path --set "$editor_path" --non-interactive
 
-      - name: Cache Unity downloads
-        uses: actions/cache@v4
+      - name: Restore Unity Editor cache
+        id: cache-unity-editor
+        uses: actions/cache/restore@v4
         with:
-          path: ~/.config/UnityHub/downloads
-          key: UnityDownloads-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-linux-il2cpp-android
+          path: ${{ runner.temp }}/unity-editors
+          key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-linux-il2cpp-android
 
       - name: Install Unity Editor
+        if: steps.cache-unity-editor.outputs.cache-hit != 'true'
         shell: bash
         run: unity install "$UNITY_VERSION" --module linux-il2cpp --module android --childModules --accept-eula --yes --non-interactive
+
+      - name: Resolve Unity Editor
+        shell: bash
+        run: |
+          editor=$(find "$UNITY_EDITOR_PATH" -type f -name Unity -executable -print -quit)
+          if [ -z "$editor" ]; then
+            printf 'Unity executable was not found under %s.\n' "$UNITY_EDITOR_PATH" >&2
+            exit 1
+          fi
+
+          printf 'UNITY_EDITOR_BINARY=%s\n' "$editor" >> "$GITHUB_ENV"
+
+      - name: Save Unity Editor cache
+        if: steps.cache-unity-editor.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/unity-editors
+          key: UnityEditor-${{ runner.os }}-x64-${{ env.UNITY_CLI_VERSION }}-${{ env.UNITY_VERSION }}-linux-il2cpp-android
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -236,7 +275,7 @@ jobs:
             --target StandaloneLinux64 \
             --execute-method Editor.GameBuilder.Build \
             --output-path build/StandaloneLinux64/SentaurSurvivors-StandaloneLinux64 \
-            --editor-version "$UNITY_VERSION" \
+            --editor-path "$UNITY_EDITOR_BINARY" \
             --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
             --no-tail \
             --non-interactive
@@ -259,7 +298,7 @@ jobs:
             --target Android \
             --execute-method Editor.GameBuilder.Build \
             --output-path build/Android/SentaurSurvivors-Android.apk \
-            --editor-version "$UNITY_VERSION" \
+            --editor-path "$UNITY_EDITOR_BINARY" \
             --args "-dsn $DSN -auth_token $AUTH_TOKEN" \
             --no-tail \
             --non-interactive
