@@ -114,7 +114,13 @@ jobs:
           fi
 
           chmod +x "$executable"
-          if ! xvfb-run --auto-servernum "$executable" -demo; then
+          if timeout --signal=TERM --kill-after=30s 9m xvfb-run --auto-servernum "$executable" -demo; then
+            game_exit_code=0
+          else
+            game_exit_code=$?
+          fi
+
+          if [ "$game_exit_code" -ne 0 ]; then
             printf '%s\n' 'Linux demo exited unsuccessfully.' >&2
           fi
 
@@ -129,10 +135,25 @@ jobs:
             printf 'Unity log file not found at: %s\n' "$log_path"
           fi
 
+          if [ "$game_exit_code" -eq 124 ]; then
+            printf '%s\n' 'Linux demo exceeded its nine-minute limit.' >&2
+            exit 1
+          fi
+
+      - name: Upload Linux player log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-Linux-PlayerLog
+          path: ~/.config/unity3d/Sentry/SentaurSurvivors/Player.log
+          if-no-files-found: warn
+
   run-android:
     name: Run Android Build
     needs: get-build-run
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
+    env:
+      ANDROID_SERIAL: localhost:5555
 
     steps:
       - name: Checkout repository
@@ -154,46 +175,39 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ needs.get-build-run.outputs.run-id }}
 
-      - name: Enable KVM group permissions
+      - name: Start Redroid container
         run: |
-          printf '%s\n' 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules > /dev/null
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update
+          sudo apt-get install -y adb aapt "linux-modules-extra-$(uname -r)"
+          sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
+          sudo modprobe ashmem_linux || true
+          docker run -d --rm --privileged --name redroid -p 5555:5555 redroid/redroid:13.0.0_64only-latest androidboot.redroid_gpu_mode=guest
 
-      - name: Add Android build-tools to PATH
-        shell: pwsh
+      - name: Wait for Redroid
         run: |
-          $buildToolsDirectory = (Get-ChildItem "$env:ANDROID_HOME/build-tools" -Directory | Sort-Object { [version]$_.Name } | Select-Object -Last 1).FullName
-          $buildToolsDirectory >> $env:GITHUB_PATH
+          for attempt in $(seq 1 60); do
+            adb connect localhost:5555 > /dev/null 2>&1 || true
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              exit 0
+            fi
+            printf 'Waiting for Redroid (%s/60)\n' "$attempt"
+            sleep 5
+          done
 
-      - name: Set up Android directories
-        run: |
-          mkdir -p "$HOME/.android/avd"
-          touch "$HOME/.android/repositories.cfg"
+          adb devices -l
+          docker logs redroid
+          exit 1
 
       - name: Run Build
-        uses: reactivecircus/android-emulator-runner@0a638108440efd5c7f980e6ba145dbcdd8f32009 # v2.37.0
         timeout-minutes: 15
         env:
           SENTRY_DSN: ${{ secrets.DSN }}
+        run: pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors-Android.apk -Dsn "$SENTRY_DSN"
+
+      - name: Upload Android player log
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          channel: stable
-          force-avd-creation: true
-          disable-animations: true
-          disable-spellchecker: true
-          emulator-options: >
-            -no-window
-            -no-snapshot-save
-            -gpu swiftshader_indirect
-            -noaudio
-            -no-boot-anim
-            -camera-back none
-            -camera-front none
-            -no-metrics
-          script: |
-            adb wait-for-device
-            adb shell input keyevent 82
-            pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors-Android.apk -Dsn "$SENTRY_DSN"
+          name: SentaurSurvivors-Android-PlayerLog
+          path: android-player.log
+          if-no-files-found: warn

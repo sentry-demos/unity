@@ -20,6 +20,13 @@ namespace Editor
                 Directory.CreateDirectory(outputDirectory);
             }
 
+            if (target == BuildTarget.Android)
+            {
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 });
+            }
+
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = GetEnabledScenes(),

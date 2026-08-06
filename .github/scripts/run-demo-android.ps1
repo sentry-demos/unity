@@ -24,7 +24,15 @@ try {
     }
 
     $result = Invoke-DeviceApp -ExecutablePath $activity -Arguments @('-e', 'unity', '-demo', '-e', 'dsn', $Dsn)
-    $result.Output | Write-Output
+    $result.Output | Tee-Object -FilePath android-player.log
+    $logs = $result.Output -join "`n"
+    if ($logs -notmatch 'Start Game') {
+        throw 'Android demo did not reach gameplay.'
+    }
+
+    if ($logs -notmatch 'Attempting save_score_to_disk') {
+        throw 'Android demo did not reach the expected native crash.'
+    }
 }
 finally {
     Disconnect-Device
