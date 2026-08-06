@@ -105,7 +105,7 @@ jobs:
       - name: Run Build
         timeout-minutes: 10
         env:
-          SENTRY_DSN: ${{ secrets.DSN }}
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
           executable=./build/SentaurSurvivors-StandaloneLinux64
           if [ ! -f "$executable" ]; then
@@ -217,7 +217,7 @@ jobs:
       - name: Run Build
         timeout-minutes: 15
         env:
-          SENTRY_DSN: ${{ secrets.DSN }}
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors-Android.apk -Dsn "$SENTRY_DSN"
 
       - name: Upload Android player log

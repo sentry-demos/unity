@@ -13,17 +13,17 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
             return;
         }
         
-        Debug.Log("Getting the 'AUTH TOKEN' from the  commandline arguments.");
+        Debug.Log("Getting the 'AUTH TOKEN' from the environment.");
         
-        var token = ArgumentReader.GetCommandLineArg("auth_token");
+        var token = System.Environment.GetEnvironmentVariable("SENTRY_AUTH_TOKEN");
         if (!string.IsNullOrEmpty(token))
         {
-            Debug.Log("Setting the 'AUTH TOKEN' from command line arguments.");
+            Debug.Log("Setting the 'AUTH TOKEN' from environment.");
             cliOptions.Auth = token;
         }
         else
         {
-            Debug.LogError("Failed to get the 'AUTH TOKEN' from both environment variable and command line arguments.");
+            Debug.LogError("Failed to get the 'AUTH TOKEN' from environment.");
         }
 
 #if UNITY_ANDROID
