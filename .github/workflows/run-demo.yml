@@ -133,6 +133,22 @@ jobs:
             printf '%s\n' '::endgroup::'
           else
             printf 'Unity log file not found at: %s\n' "$log_path"
+            exit 1
+          fi
+
+          if ! grep -Fq 'Start Game' "$log_path"; then
+            printf '%s\n' 'Linux demo did not reach gameplay.' >&2
+            exit 1
+          fi
+
+          if ! grep -Fq 'Attempting save_score_to_disk' "$log_path"; then
+            printf '%s\n' 'Linux demo did not reach the expected native crash.' >&2
+            exit 1
+          fi
+
+          if [ "$game_exit_code" -eq 0 ]; then
+            printf '%s\n' 'Linux demo exited without the expected native crash.' >&2
+            exit 1
           fi
 
           if [ "$game_exit_code" -eq 124 ]; then

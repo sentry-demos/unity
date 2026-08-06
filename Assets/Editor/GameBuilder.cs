@@ -27,6 +27,14 @@ namespace Editor
                 PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 });
             }
 
+            if (target == BuildTarget.StandaloneLinux64)
+            {
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneLinux64, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore });
+                PlayerSettings.gpuSkinning = false;
+                PlayerSettings.graphicsJobs = false;
+            }
+
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = GetEnabledScenes(),
