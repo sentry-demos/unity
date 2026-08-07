@@ -84,7 +84,7 @@ MonoBehaviour:
   <Experimental>k__BackingField:
     <MacosBackend>k__BackingField: 0
     <WindowsBackend>k__BackingField: 0
-    <LinuxBackend>k__BackingField: 0
+    <LinuxBackend>k__BackingField: 1
     <EnableNativeAppHangTracking>k__BackingField: 1
   <OptionsConfiguration>k__BackingField: {fileID: 11400000, guid: 25178abd783614c03b050025b14a05bb, type: 2}
   <Debug>k__BackingField: 1

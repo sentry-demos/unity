@@ -15,7 +15,7 @@ if (-not (Test-Path $ApkPath)) {
 
 Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
 
-Connect-Device -Platform Adb
+$session = Connect-Device -Platform Adb
 try {
     Install-DeviceApp -Path $ApkPath
     $activity = (adb shell cmd package resolve-activity --brief io.sentry | Where-Object { $_ -match '^io\.sentry/' } | Select-Object -Last 1).Trim()
@@ -33,6 +33,11 @@ try {
     if ($logs -notmatch 'Attempting save_score_to_disk') {
         throw 'Android demo did not reach the expected native crash.'
     }
+
+    $session.Provider.Timeouts['run-timeout'] = 10
+    $relaunch = Invoke-DeviceApp -ExecutablePath $activity -Arguments @('-e', 'dsn', $Dsn)
+    $relaunch.Output | Tee-Object -FilePath android-player.log -Append
+    adb shell am force-stop io.sentry
 }
 finally {
     Disconnect-Device
