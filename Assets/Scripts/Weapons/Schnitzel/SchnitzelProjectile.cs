@@ -12,7 +12,7 @@ public class SchnitzelProjectile : ProjectileBase
     private Vector3 _direction;
     private float _creationTime;
 
-    private HashSet<int> enemiesHit = new HashSet<int>();
+    private readonly HashSet<EntityId> _enemiesHit = new();
 
     public void Start()
     {
@@ -44,12 +44,12 @@ public class SchnitzelProjectile : ProjectileBase
     protected override void OnDamage(Enemy enemy)
     {
         // each projectile can only damage an enemy once
-        if (enemiesHit.Contains(enemy.GetInstanceID()))
+        if (_enemiesHit.Contains(enemy.GetEntityId()))
         {
             return;
         }
 
-        enemiesHit.Add(enemy.GetInstanceID());
+        _enemiesHit.Add(enemy.GetEntityId());
         base.OnDamage(enemy);
     }
 

@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Sentry;
 using UnityEngine;
 
 class UpgradeManager : MonoBehaviour
 {
     List<UpgradePathBase> _availableUpgrades = new List<UpgradePathBase>();
+    BattleSceneManager _gameManager;
 
     private static UpgradeManager _instance;
 
@@ -14,7 +16,7 @@ class UpgradeManager : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindFirstObjectByType<UpgradeManager>();
+                _instance = FindAnyObjectByType<UpgradeManager>();
             }
             return _instance;
         }
@@ -23,6 +25,7 @@ class UpgradeManager : MonoBehaviour
     public void Awake()
     {
         _availableUpgrades.AddRange(GetComponentsInChildren<UpgradePathBase>());
+        _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
 
         // dart starts at level 1
         GetComponentInChildren<DartUpgradePath>()
@@ -72,7 +75,7 @@ class UpgradeManager : MonoBehaviour
         upgradePath.LevelUp(); // level up the selected upgrade
 
         // _upgradeData[selectedUpgrade].LevelUp(); // level up the selected upgrade
-
+        
         if (upgradePath.IsMaxLevel())
         {
             // take the upgrade out of the pool if it's maxed out
