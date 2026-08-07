@@ -9,15 +9,12 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Weekly on Sunday at midnight to ensure artifacts don't expire
 
-jobs:
-  cancel-previous-workflow:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # pin@0.11.0
-        with:
-          access_token: ${{ github.token }}
+# The floating license has one seat shared by all workflow runs; keep only latest run.
+concurrency:
+  group: unity-floating-license
+  cancel-in-progress: true
 
+jobs:
   build:
     name: Build Windows
     runs-on: windows-2022
@@ -39,7 +36,15 @@ jobs:
           $version = (Get-Content ProjectSettings/ProjectVersion.txt | Where-Object { $_ -match '^m_EditorVersion:' }).Split(':')[1].Trim()
           "UNITY_VERSION=$version" >> $env:GITHUB_ENV
 
+      - name: Restore Windows Build Cache
+        id: cache-build
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: Build-v1-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**') }}
+
       - name: Install Unity CLI
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
@@ -47,6 +52,7 @@ jobs:
           "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
 
       - name: Verify Unity CLI
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $version = (unity --version).Trim()
@@ -55,6 +61,7 @@ jobs:
           }
 
       - name: Set Unity Editor install path
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
@@ -63,16 +70,19 @@ jobs:
           unity install-path --set "$editorPath" --non-interactive
 
       - name: Install Unity Editor
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
 
       - name: Cache Unity Library
+        if: steps.cache-build.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: Library
           key: Library-v2-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
       - name: Configure Unity license server
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
@@ -92,12 +102,14 @@ jobs:
           } | ConvertTo-Json | Set-Content -Path (Join-Path $configDirectory 'services-config.json')
 
       - name: Acquire Unity floating license
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           unity license server status --format json
           unity license activate --floating --non-interactive
 
       - name: Build Windows player
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -110,8 +122,15 @@ jobs:
             --editor-version "$env:UNITY_VERSION" `
             --non-interactive
 
+      - name: Save Windows Build Cache
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ${{ steps.cache-build.outputs.cache-primary-key }}
+
       - name: Return Unity floating license
-        if: always()
+        if: always() && steps.cache-build.outputs.cache-hit != 'true'
         continue-on-error: true
         shell: pwsh
         run: |
@@ -124,7 +143,7 @@ jobs:
 
       - name: Upload Windows Unity Build Logs
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.cache-build.outputs.cache-hit != 'true'
         with:
           name: SentaurSurvivors-Windows-UnityLogs
           path: Logs/build-*.log
@@ -162,17 +181,27 @@ jobs:
           unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
           printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
 
+      - name: Restore Linux and Android Build Cache
+        id: cache-build
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: Build-v1-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**') }}
+
       - name: Install Unity CLI
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           UNITY_CLI_CHANNEL: beta
         run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
 
       - name: Add Unity CLI to PATH
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify Unity CLI
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           version=$(unity --version)
@@ -182,6 +211,7 @@ jobs:
           fi
 
       - name: Set Unity Editor install path
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           editor_path="$RUNNER_TEMP/unity-editors"
@@ -190,16 +220,19 @@ jobs:
           unity install-path --set "$editor_path" --non-interactive
 
       - name: Install Unity Editor
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: unity install "$UNITY_VERSION" --module linux-il2cpp --module android --childModules --accept-eula --yes --non-interactive
 
       - name: Cache Unity Library
+        if: steps.cache-build.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: Library
           key: Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
       - name: Configure Unity license server
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
@@ -219,12 +252,14 @@ jobs:
           }' | sudo tee /usr/share/unity3d/config/services-config.json > /dev/null
 
       - name: Acquire Unity floating license
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           unity license server status --format json || true
           unity license activate --floating --format json --non-interactive
 
       - name: Build Linux player
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -247,6 +282,7 @@ jobs:
           retention-days: 90
 
       - name: Build Android player
+        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -260,6 +296,13 @@ jobs:
             --no-tail \
             --non-interactive
 
+      - name: Save Linux and Android Build Cache
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ${{ steps.cache-build.outputs.cache-primary-key }}
+
       - name: Upload Android Build Artifact
         uses: actions/upload-artifact@v4
         if: always()
@@ -269,7 +312,7 @@ jobs:
           retention-days: 90
 
       - name: Return Unity floating license
-        if: always()
+        if: always() && steps.cache-build.outputs.cache-hit != 'true'
         continue-on-error: true
         shell: bash
         run: |
@@ -281,7 +324,7 @@ jobs:
 
       - name: Upload Linux Unity Build Logs
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.cache-build.outputs.cache-hit != 'true'
         with:
           name: SentaurSurvivors-Linux-UnityLogs
           path: Logs/build-*.log
