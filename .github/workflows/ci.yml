@@ -114,6 +114,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_LOG_LEVEL: info
         run: |
           unity build . `
             --target StandaloneWindows64 `
@@ -264,6 +265,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_LOG_LEVEL: info
         run: |
           unity build . \
             --target StandaloneLinux64 \
@@ -287,6 +289,7 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_LOG_LEVEL: info
         run: |
           unity build . \
             --target Android \
