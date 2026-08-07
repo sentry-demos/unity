@@ -116,7 +116,7 @@ jobs:
             exit 1
           fi
 
-          pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Linux -ExecutablePath "$executable"
+          xvfb-run pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Linux -ExecutablePath "$executable"
 
       - name: Upload Linux player log
         if: always()
