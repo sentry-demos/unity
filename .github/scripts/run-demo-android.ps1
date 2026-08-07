@@ -15,7 +15,8 @@ if (-not (Test-Path $ApkPath)) {
 
 Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
 
-$session = Connect-Device -Platform Adb
+Connect-Device -Platform Adb | Out-Null
+$session = Get-DeviceSession
 try {
     Install-DeviceApp -Path $ApkPath
     $activity = (adb shell cmd package resolve-activity --brief io.sentry | Where-Object { $_ -match '^io\.sentry/' } | Select-Object -Last 1).Trim()
