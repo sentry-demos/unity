@@ -45,7 +45,7 @@ jobs:
       - name: Run Build
         timeout-minutes: 10
         env:
-          SENTRY_DSN: ${{ secrets.DSN }}
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
           $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
           if ($exePath)

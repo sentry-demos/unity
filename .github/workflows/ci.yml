@@ -108,7 +108,7 @@ jobs:
       - name: Build Windows player
         shell: pwsh
         env:
-          DSN: ${{ secrets.DSN }}
+          DSN: ${{ secrets.TEST_DSN }}
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |
           unity build . `
