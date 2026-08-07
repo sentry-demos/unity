@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build
-          key: Build-v1-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**') }}
+          key: Build-v1-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
 
       - name: Install Unity CLI
         if: steps.cache-build.outputs.cache-hit != 'true'
@@ -187,7 +187,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build
-          key: Build-v1-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**') }}
+          key: Build-v1-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
 
       - name: Install Unity CLI
         if: steps.cache-build.outputs.cache-hit != 'true'
