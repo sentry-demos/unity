@@ -44,6 +44,8 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
             cliOptions.Project = project;
         }
 
+        Debug.Log($"Uploading debug symbols to '{cliOptions.Organization}/{cliOptions.Project}'.");
+
         cliOptions.UrlOverride = "https://sentry.io";
     }
 }
