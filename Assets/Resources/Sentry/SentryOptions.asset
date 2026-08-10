@@ -89,4 +89,4 @@ MonoBehaviour:
   <OptionsConfiguration>k__BackingField: {fileID: 11400000, guid: 25178abd783614c03b050025b14a05bb, type: 2}
   <Debug>k__BackingField: 1
   <DebugOnlyInEditor>k__BackingField: 0
-  <DiagnosticLevel>k__BackingField: 2
+  <DiagnosticLevel>k__BackingField: 1
