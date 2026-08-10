@@ -113,7 +113,7 @@ jobs:
         shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.TEST_ORG }}
           SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
@@ -266,7 +266,7 @@ jobs:
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.TEST_ORG }}
           SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
@@ -292,7 +292,7 @@ jobs:
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.TEST_ORG }}
           SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
