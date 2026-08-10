@@ -114,6 +114,8 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.TEST_ORG }}
+          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
         run: |
           unity build . `
@@ -265,6 +267,8 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.TEST_ORG }}
+          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
         run: |
           unity build . \
@@ -289,6 +293,8 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.TEST_ORG }}
+          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: info
         run: |
           unity build . \

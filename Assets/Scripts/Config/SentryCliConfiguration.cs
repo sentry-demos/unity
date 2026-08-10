@@ -10,20 +10,21 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         if (!string.IsNullOrEmpty(cliOptions.Auth))
         {
             Debug.Log("The 'AUTH TOKEN' is already set.");
-            return;
-        }
-        
-        Debug.Log("Getting the 'AUTH TOKEN' from the environment.");
-        
-        var token = System.Environment.GetEnvironmentVariable("SENTRY_AUTH_TOKEN");
-        if (!string.IsNullOrEmpty(token))
-        {
-            Debug.Log("Setting the 'AUTH TOKEN' from environment.");
-            cliOptions.Auth = token;
         }
         else
         {
-            Debug.LogError("Failed to get the 'AUTH TOKEN' from environment.");
+            Debug.Log("Getting the 'AUTH TOKEN' from the environment.");
+
+            var token = System.Environment.GetEnvironmentVariable("SENTRY_AUTH_TOKEN");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Debug.Log("Setting the 'AUTH TOKEN' from environment.");
+                cliOptions.Auth = token;
+            }
+            else
+            {
+                Debug.LogError("Failed to get the 'AUTH TOKEN' from environment.");
+            }
         }
 
 #if UNITY_ANDROID
@@ -31,8 +32,18 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         cliOptions.UploadSources = false;
 #endif
         
-        cliOptions.Organization = "demo";
-        cliOptions.Project = "unity";
+        var organization = System.Environment.GetEnvironmentVariable("SENTRY_ORG");
+        if (!string.IsNullOrEmpty(organization))
+        {
+            cliOptions.Organization = organization;
+        }
+
+        var project = System.Environment.GetEnvironmentVariable("SENTRY_PROJECT");
+        if (!string.IsNullOrEmpty(project))
+        {
+            cliOptions.Project = project;
+        }
+
         cliOptions.UrlOverride = "https://sentry.io";
     }
 }
