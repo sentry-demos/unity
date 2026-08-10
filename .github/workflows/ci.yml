@@ -159,7 +159,7 @@ jobs:
         if: always() && steps.cache-build.outputs.cache-hit != 'true'
         with:
           name: SentaurSurvivors-Windows-UnityLogs
-          path: Logs/build-*.log
+          path: Logs
           retention-days: 90
           if-no-files-found: warn
 
@@ -356,7 +356,7 @@ jobs:
         if: always() && steps.cache-build.outputs.cache-hit != 'true'
         with:
           name: SentaurSurvivors-Linux-UnityLogs
-          path: Logs/build-*.log
+          path: Logs
           retention-days: 90
           if-no-files-found: warn
 
