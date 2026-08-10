@@ -18,6 +18,12 @@ Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
 
 if ($Platform -eq 'Linux') {
     & chmod +x $ExecutablePath
+
+    $crashHandler = Join-Path (Split-Path $ExecutablePath) 'sentry-crash'
+    if (-not (Test-Path $crashHandler)) {
+        throw "sentry-crash not found next to executable: $crashHandler"
+    }
+    & chmod +x $crashHandler
 }
 
 $runner = $ExecutablePath
