@@ -28,7 +28,6 @@ public class SentryCliConfiguration : SentryCliOptionsConfiguration
         }
 
 #if UNITY_ANDROID
-        // TODO: sentry-cli seems to choke in CI trying to upload
         cliOptions.UploadSources = false;
 #endif
         

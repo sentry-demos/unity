@@ -134,11 +134,21 @@ jobs:
 
       - name: Return Unity floating license
         if: always() && steps.cache-build.outputs.cache-hit != 'true'
-        continue-on-error: true
         shell: pwsh
         run: |
           if (Get-Command unity -ErrorAction SilentlyContinue) {
-            unity license return --yes --non-interactive
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              unity license return --yes --non-interactive
+              if ($LASTEXITCODE -eq 0) {
+                break
+              }
+
+              if ($attempt -eq 3) {
+                throw "Failed to return Unity floating license after $attempt attempts."
+              }
+
+              Start-Sleep -Seconds 5
+            }
           }
 
           $configPath = Join-Path $env:ProgramData 'Unity/config/services-config.json'
@@ -322,11 +332,21 @@ jobs:
 
       - name: Return Unity floating license
         if: always() && steps.cache-build.outputs.cache-hit != 'true'
-        continue-on-error: true
         shell: bash
         run: |
           if command -v unity > /dev/null; then
-            unity license return --yes --non-interactive
+            for attempt in 1 2 3; do
+              if unity license return --yes --non-interactive; then
+                break
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                printf '%s\n' "Failed to return Unity floating license after $attempt attempts." >&2
+                exit 1
+              fi
+
+              sleep 5
+            done
           fi
 
           sudo rm -f /usr/share/unity3d/config/services-config.json
