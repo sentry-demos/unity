@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Windows', 'Linux')]
+    [ValidateSet('Windows', 'Linux', 'macOS')]
     [string]$Platform,
 
     [Parameter(Mandatory = $true)]
@@ -15,6 +15,13 @@ if (-not (Test-Path $ExecutablePath)) {
 }
 
 Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
+
+if ($Platform -eq 'macOS') {
+    # The artifact upload/download round trip drops the executable bit and the
+    # quarantine-free extended attributes the bundle needs to launch.
+    & chmod +x $ExecutablePath
+    & xattr -cr (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ExecutablePath)))
+}
 
 if ($Platform -eq 'Linux') {
     & chmod +x $ExecutablePath

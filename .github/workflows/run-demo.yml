@@ -127,6 +127,101 @@ jobs:
           path: desktop-player.log
           if-no-files-found: warn
 
+  run-macos:
+    name: Run macOS Build
+    needs: get-build-run
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check out app-runner
+        uses: actions/checkout@v4
+        with:
+          repository: getsentry/app-runner
+          ref: 8be06e220d490e527b810f6d073872025bf491b3
+          path: app-runner
+
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneOSX
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.get-build-run.outputs.run-id }}
+
+      - name: Extract Build
+        run: |
+          mkdir -p build
+          tar -xzf SentaurSurvivors-macOS.tar.gz -C build
+
+      - name: Run Build
+        timeout-minutes: 10
+        env:
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+        run: |
+          executable=./build/SentaurSurvivors.app/Contents/MacOS/SentaurSurvivors
+          if [ ! -f "$executable" ]; then
+            printf 'macOS executable not found: %s\n' "$executable" >&2
+            exit 1
+          fi
+
+          pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform macOS -ExecutablePath "$executable"
+
+      - name: Upload macOS player log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-macOS-PlayerLog
+          path: desktop-player.log
+          if-no-files-found: warn
+
+  run-ios:
+    name: Run iOS Build
+    needs: get-build-run
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check out app-runner
+        uses: actions/checkout@v4
+        with:
+          repository: getsentry/app-runner
+          ref: 8be06e220d490e527b810f6d073872025bf491b3
+          path: app-runner
+
+      - name: Download Build
+        uses: actions/download-artifact@v4
+        with:
+          name: SentaurSurvivors-iOS
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.get-build-run.outputs.run-id }}
+
+      - name: Extract Build
+        run: |
+          mkdir -p build
+          tar -xzf SentaurSurvivors-iOS.tar.gz -C build
+
+      - name: Run Build
+        timeout-minutes: 15
+        env:
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+        run: pwsh -File .github/scripts/run-demo-ios.ps1 -AppPath ./build/SentaurSurvivors.app -Dsn "$SENTRY_DSN"
+
+      - name: Upload iOS player log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-iOS-PlayerLog
+          path: ios-player.log
+          if-no-files-found: warn
+
   run-android:
     name: Run Android Build
     needs: get-build-run
