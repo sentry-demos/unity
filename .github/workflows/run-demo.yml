@@ -65,12 +65,12 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
-          $exePath = Get-ChildItem -Path "./build" -Filter "SentaurSurvivors-*.exe" -Recurse | Select-Object -First 1
-          if ($null -eq $exePath) {
-            throw "No SentaurSurvivors executable found in build artifacts"
+          $executable = "./build/SentaurSurvivors.exe"
+          if (-not (Test-Path $executable)) {
+            throw "Windows executable not found: $executable"
           }
 
-          pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Windows -ExecutablePath $exePath.FullName
+          pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Windows -ExecutablePath (Resolve-Path $executable).Path
 
       - name: Upload Windows player log
         if: always()
@@ -110,12 +110,13 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
-          executable=./build/SentaurSurvivors-StandaloneLinux64
+          executable=./build/SentaurSurvivors
           if [ ! -f "$executable" ]; then
             printf 'Linux executable not found: %s\n' "$executable" >&2
             exit 1
           fi
 
+          chmod +x "$executable"
           xvfb-run pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Linux -ExecutablePath "$executable"
 
       - name: Upload Linux player log
@@ -180,7 +181,7 @@ jobs:
         timeout-minutes: 15
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-        run: pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors-Android.apk -Dsn "$SENTRY_DSN"
+        run: pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors.apk -Dsn "$SENTRY_DSN"
 
       - name: Upload Android player log
         if: always()
