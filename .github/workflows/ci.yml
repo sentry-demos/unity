@@ -98,16 +98,17 @@ jobs:
         shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.TEST_ORG }}
-          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: debug
         run: |
+          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
+          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
+          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
           unity build . `
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
             --output-path Build/StandaloneWindows64/SentaurSurvivors.exe `
             --editor-version "$env:UNITY_VERSION" `
+            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" `
             --non-interactive
 
       - name: Return Unity floating license
@@ -236,16 +237,17 @@ jobs:
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.TEST_ORG }}
-          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: debug
         run: |
+          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
+          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
+          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
           unity build . \
             --target StandaloneLinux64 \
             --execute-method Editor.GameBuilder.Build \
             --output-path Build/StandaloneLinux64/SentaurSurvivors \
             --editor-version "$UNITY_VERSION" \
+            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
             --non-interactive
 
       - name: Upload Linux Build Artifact
@@ -260,9 +262,6 @@ jobs:
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.TEST_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.TEST_ORG }}
-          SENTRY_PROJECT: ${{ secrets.TEST_PROJECT }}
           SENTRY_LOG_LEVEL: debug
         run: |
           unity build . \
@@ -270,6 +269,7 @@ jobs:
             --execute-method Editor.GameBuilder.Build \
             --output-path Build/Android/SentaurSurvivors.apk \
             --editor-version "$UNITY_VERSION" \
+            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
             --non-interactive
 
       - name: Return Unity floating license
