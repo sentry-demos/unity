@@ -7,15 +7,14 @@ on:
   pull_request:
   workflow_dispatch: # e.g. to manually trigger on foreign PRs
   schedule:
-    - cron: '0 0 * * 0' # Weekly on Sunday at midnight to ensure artifacts don't expire
+    - cron: "0 0 * * 0"
 
-# The floating license has one seat shared by all workflow runs; keep only latest run.
 concurrency:
   group: unity-floating-license
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-windows:
     name: Build Windows
     runs-on: windows-2022
     env:
@@ -36,15 +35,7 @@ jobs:
           $version = (Get-Content ProjectSettings/ProjectVersion.txt | Where-Object { $_ -match '^m_EditorVersion:' }).Split(':')[1].Trim()
           "UNITY_VERSION=$version" >> $env:GITHUB_ENV
 
-      - name: Restore Windows Build Cache
-        id: cache-build
-        uses: actions/cache/restore@v4
-        with:
-          path: build
-          key: Build-v1-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
-
       - name: Install Unity CLI
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
@@ -52,7 +43,6 @@ jobs:
           "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
 
       - name: Verify Unity CLI
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $version = (unity --version).Trim()
@@ -61,7 +51,6 @@ jobs:
           }
 
       - name: Set Unity Editor install path
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
@@ -70,19 +59,10 @@ jobs:
           unity install-path --set "$editorPath" --non-interactive
 
       - name: Install Unity Editor
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
 
-      - name: Cache Unity Library
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-v2-${{ runner.os }}-StandaloneWindows64-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-
       - name: Configure Unity license server
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
@@ -101,15 +81,20 @@ jobs:
             clientHandshakeTimeoutSec = 10
           } | ConvertTo-Json | Set-Content -Path (Join-Path $configDirectory 'services-config.json')
 
+      - name: Restore Library
+        id: cache-windows-library
+        uses: actions/cache/restore@v4
+        with:
+          path: Library
+          key: Library-StandaloneWindows64-
+
       - name: Acquire Unity floating license
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           unity license server status --format json
           unity license activate --floating --non-interactive
 
       - name: Build Windows player
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -121,19 +106,12 @@ jobs:
           unity build . `
             --target StandaloneWindows64 `
             --execute-method Editor.GameBuilder.Build `
-            --output-path build/StandaloneWindows64/SentaurSurvivors-StandaloneWindows64.exe `
+            --output-path Build/StandaloneWindows64/SentaurSurvivors.exe `
             --editor-version "$env:UNITY_VERSION" `
             --non-interactive
 
-      - name: Save Windows Build Cache
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: build
-          key: ${{ steps.cache-build.outputs.cache-primary-key }}
-
       - name: Return Unity floating license
-        if: always() && steps.cache-build.outputs.cache-hit != 'true'
+        if: always()
         shell: pwsh
         run: |
           if (Get-Command unity -ErrorAction SilentlyContinue) {
@@ -154,26 +132,23 @@ jobs:
           $configPath = Join-Path $env:ProgramData 'Unity/config/services-config.json'
           Remove-Item -Path $configPath -Force -ErrorAction SilentlyContinue
 
-      - name: Upload Windows Unity Build Logs
-        uses: actions/upload-artifact@v4
-        if: always() && steps.cache-build.outputs.cache-hit != 'true'
-        with:
-          name: SentaurSurvivors-Windows-UnityLogs
-          path: Logs
-          retention-days: 90
-          if-no-files-found: warn
-
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: SentaurSurvivors-StandaloneWindows64
-          path: build
+          path: Build/StandaloneWindows64
           retention-days: 90
+
+      - name: Save Library
+        uses: actions/cache/save@v4
+        with:
+          path: Library
+          key: ${{ steps.cache-windows-library.outputs.cache-primary-key }}
 
   build-linux:
     name: Build Linux and Android
-    needs: build
+    needs: build-windows
     if: always()
     runs-on: ubuntu-22.04
     env:
@@ -194,27 +169,17 @@ jobs:
           unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
           printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
 
-      - name: Restore Linux and Android Build Cache
-        id: cache-build
-        uses: actions/cache/restore@v4
-        with:
-          path: build
-          key: Build-v1-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'ProjectSettings/**') }}
-
       - name: Install Unity CLI
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           UNITY_CLI_CHANNEL: beta
         run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
 
       - name: Add Unity CLI to PATH
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify Unity CLI
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           version=$(unity --version)
@@ -224,7 +189,6 @@ jobs:
           fi
 
       - name: Set Unity Editor install path
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           editor_path="$RUNNER_TEMP/unity-editors"
@@ -233,19 +197,10 @@ jobs:
           unity install-path --set "$editor_path" --non-interactive
 
       - name: Install Unity Editor
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: unity install "$UNITY_VERSION" --module linux-il2cpp --module android --childModules --accept-eula --yes --non-interactive
 
-      - name: Cache Unity Library
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-${{ runner.os }}-StandaloneLinux64-Android-${{ env.UNITY_VERSION }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-
       - name: Configure Unity license server
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
@@ -264,15 +219,20 @@ jobs:
             clientHandshakeTimeoutSec: 10
           }' | sudo tee /usr/share/unity3d/config/services-config.json > /dev/null
 
+      - name: Restore Library
+        id: cache-linux-library
+        uses: actions/cache/restore@v4
+        with:
+          path: Library
+          key: Library-StandaloneLinux64-
+
       - name: Acquire Unity floating license
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         run: |
           unity license server status --format json || true
           unity license activate --floating --format json --non-interactive
 
       - name: Build Linux player
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -284,21 +244,19 @@ jobs:
           unity build . \
             --target StandaloneLinux64 \
             --execute-method Editor.GameBuilder.Build \
-            --output-path build/StandaloneLinux64/SentaurSurvivors-StandaloneLinux64 \
+            --output-path Build/StandaloneLinux64/SentaurSurvivors \
             --editor-version "$UNITY_VERSION" \
-            --no-tail \
             --non-interactive
 
       - name: Upload Linux Build Artifact
         uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: SentaurSurvivors-StandaloneLinux64
-          path: build/StandaloneLinux64
+          path: Build/StandaloneLinux64
           retention-days: 90
 
       - name: Build Android player
-        if: steps.cache-build.outputs.cache-hit != 'true'
         shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
@@ -310,28 +268,12 @@ jobs:
           unity build . \
             --target Android \
             --execute-method Editor.GameBuilder.Build \
-            --output-path build/Android/SentaurSurvivors-Android.apk \
+            --output-path Build/Android/SentaurSurvivors.apk \
             --editor-version "$UNITY_VERSION" \
-            --no-tail \
             --non-interactive
 
-      - name: Save Linux and Android Build Cache
-        if: steps.cache-build.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: build
-          key: ${{ steps.cache-build.outputs.cache-primary-key }}
-
-      - name: Upload Android Build Artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: SentaurSurvivors-Android
-          path: build/Android
-          retention-days: 90
-
       - name: Return Unity floating license
-        if: always() && steps.cache-build.outputs.cache-hit != 'true'
+        if: always()
         shell: bash
         run: |
           if command -v unity > /dev/null; then
@@ -351,18 +293,23 @@ jobs:
 
           sudo rm -f /usr/share/unity3d/config/services-config.json
 
-      - name: Upload Linux Unity Build Logs
+      - name: Upload Android Build Artifact
         uses: actions/upload-artifact@v4
-        if: always() && steps.cache-build.outputs.cache-hit != 'true'
+        if: success()
         with:
-          name: SentaurSurvivors-Linux-UnityLogs
-          path: Logs
+          name: SentaurSurvivors-Android
+          path: Build/Android
           retention-days: 90
-          if-no-files-found: warn
+
+      - name: Save Library
+        uses: actions/cache/save@v4
+        with:
+          path: Library
+          key: ${{ steps.cache-linux-library.outputs.cache-primary-key }}
 
   run-demo:
     name: Run Demo
-    needs: [build, build-linux]
+    needs: [build-windows, build-linux]
     uses: ./.github/workflows/run-demo.yml
     secrets: inherit
     with:
