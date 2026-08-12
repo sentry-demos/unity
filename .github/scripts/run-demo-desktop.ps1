@@ -15,6 +15,7 @@ if (-not (Test-Path $ExecutablePath)) {
 }
 
 Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
+Import-Module "$PSScriptRoot/lib/DemoRun.psm1" -Force
 
 if ($Platform -eq 'macOS') {
     # The artifact upload/download round trip drops the executable bit and the
@@ -40,20 +41,9 @@ Connect-Device -Platform Local
 try {
     $result = Invoke-DeviceApp -ExecutablePath $runner -Arguments $arguments
     $result.Output | Tee-Object -FilePath desktop-player.log
-    $logs = $result.Output -join "`n"
 
-    if ($logs -notmatch 'Start Game') {
-        throw "$Platform demo did not reach gameplay."
-    }
-
-    if ($logs -notmatch 'Attempting save_score_to_disk') {
-        throw "$Platform demo did not reach the expected native crash."
-    }
-
-    if ($result.ExitCode -eq 0) {
-        throw "$Platform demo exited without the expected native crash."
-    }
-
+    # Desktop players run as the process itself, so the crash shows up in the exit code.
+    Assert-DemoRun -Result $result -Platform $Platform -ExpectCrashExitCode
 } finally {
     Disconnect-Device
 }

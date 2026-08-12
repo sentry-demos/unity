@@ -11,6 +11,9 @@ namespace Editor
     {
         public static void Build()
         {
+            // The Unity CLI translates its own '--target' and '--output-path' flags into the
+            // legacy '-buildTarget' and '-buildOutput' editor arguments read here. That mapping
+            // is undocumented, so if a CLI upgrade breaks the build, check these names first.
             var arguments = Environment.GetCommandLineArgs();
             var target = GetBuildTarget(GetArgument(arguments, "-buildTarget"));
             var outputPath = GetArgument(arguments, "-buildOutput");

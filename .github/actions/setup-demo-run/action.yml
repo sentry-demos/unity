@@ -1,0 +1,38 @@
+name: Set up demo run
+description: >-
+  Checks out the app-runner harness and downloads a player artifact from the build
+  run. This is the one place the app-runner revision is pinned.
+
+inputs:
+  artifact:
+    description: Name of the build artifact to download.
+    required: true
+  path:
+    description: Directory the artifact is downloaded into.
+    required: false
+    default: ./build
+  build-run-id:
+    description: Run ID of the build workflow that produced the artifact.
+    required: true
+  github-token:
+    description: Token used to download the artifact from the build run.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check out app-runner
+      uses: actions/checkout@v4
+      with:
+        repository: getsentry/app-runner
+        ref: 8be06e220d490e527b810f6d073872025bf491b3
+        path: app-runner
+
+    - name: Download build
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+        path: ${{ inputs.path }}
+        github-token: ${{ inputs.github-token }}
+        repository: ${{ github.repository }}
+        run-id: ${{ inputs.build-run-id }}

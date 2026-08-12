@@ -9,6 +9,8 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
+# One floating license is shared across the whole org, so the build jobs below are
+# chained rather than run in parallel and only one workflow run holds it at a time.
 concurrency:
   group: unity-floating-license
   cancel-in-progress: true
@@ -18,7 +20,6 @@ jobs:
     name: Build macOS and iOS
     runs-on: macos-15
     env:
-      UNITY_CLI_VERSION: 1.0.0-beta.3
       UNITY_NO_CONSENT_PROMPT: 1
       UNITY_NO_UPDATE_CHECK: 1
 
@@ -29,120 +30,49 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Set Unity Version
-        shell: bash
-        run: |
-          unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
-          printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
-
-      - name: Install Unity CLI
-        shell: bash
-        env:
-          UNITY_CLI_CHANNEL: beta
-        run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
-
-      - name: Add Unity CLI to PATH
-        shell: bash
-        run: printf '%s\n' "$HOME/.unity/bin" >> "$GITHUB_PATH"
-
-      - name: Verify Unity CLI
-        shell: bash
-        run: |
-          version=$(unity --version)
-          if [ "$version" != "$UNITY_CLI_VERSION" ]; then
-            printf 'Expected Unity CLI %s, found %s.\n' "$UNITY_CLI_VERSION" "$version" >&2
-            exit 1
-          fi
-
-      - name: Set Unity Editor install path
-        shell: bash
-        run: |
-          editor_path="$RUNNER_TEMP/unity-editors"
-          mkdir -p "$editor_path"
-          printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
-          unity install-path --set "$editor_path" --non-interactive
-
-      - name: Install Unity Editor
-        shell: bash
-        run: unity install "$UNITY_VERSION" --module mac-il2cpp --module ios --childModules --accept-eula --yes --non-interactive
-
-      - name: Configure Unity license server
-        shell: bash
-        env:
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
-        run: |
-          if [ -z "$LICENSE_SERVER_URL" ]; then
-            printf '%s\n' 'LICENSE_SERVER_URL is required for Unity floating licenses.' >&2
-            exit 1
-          fi
-
-          sudo mkdir -p "/Library/Application Support/Unity/config"
-          jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
-            licensingServiceBaseUrl: $licensing_service_base_url,
-            enableEntitlementLicensing: true,
-            enableFloatingApi: true,
-            clientConnectTimeoutSec: 5,
-            clientHandshakeTimeoutSec: 10
-          }' | sudo tee "/Library/Application Support/Unity/config/services-config.json" > /dev/null
-
-      - name: Restore Library
-        id: cache-macos-library
-        uses: actions/cache/restore@v4
+      - name: Cache Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: Library-StandaloneOSX-
+          target: StandaloneOSX
 
-      - name: Acquire Unity floating license
-        shell: bash
-        run: |
-          unity license server status --format json || true
-          unity license activate --floating --format json --non-interactive
+      - name: Set up Unity
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: mac-il2cpp ios
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build macOS player
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
-          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
-          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
-          unity build . \
-            --target StandaloneOSX \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/StandaloneOSX/SentaurSurvivors.app \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneOSX
+          output-path: Build/StandaloneOSX/SentaurSurvivors.app
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
 
       # Tar the bundle: upload-artifact drops the executable bit and flattens the
       # symlinks that the .app relies on to launch.
       - name: Create macOS archive
-        if: success()
         shell: bash
         run: tar -czf SentaurSurvivors-macOS.tar.gz -C Build/StandaloneOSX SentaurSurvivors.app
 
       - name: Upload macOS Build Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: SentaurSurvivors-StandaloneOSX
           path: SentaurSurvivors-macOS.tar.gz
           retention-days: 90
 
       - name: Build iOS Xcode project
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          unity build . \
-            --target iOS \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/iOS \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
+        uses: ./.github/actions/build-player
+        with:
+          target: iOS
+          output-path: Build/iOS
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
 
       # Compiling no longer needs the editor, but the license is returned in a later
       # step so a failure here still releases it.
@@ -152,27 +82,9 @@ jobs:
 
       - name: Return Unity floating license
         if: always()
-        shell: bash
-        run: |
-          if command -v unity > /dev/null; then
-            for attempt in 1 2 3; do
-              if unity license return --yes --non-interactive; then
-                break
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                printf '%s\n' "Failed to return Unity floating license after $attempt attempts." >&2
-                exit 1
-              fi
-
-              sleep 5
-            done
-          fi
-
-          sudo rm -f "/Library/Application Support/Unity/config/services-config.json"
+        uses: ./.github/actions/return-unity-license
 
       - name: Create iOS archive
-        if: success()
         shell: bash
         run: |
           tar -czf SentaurSurvivors-iOS.tar.gz \
@@ -180,17 +92,18 @@ jobs:
 
       - name: Upload iOS Build Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: SentaurSurvivors-iOS
           path: SentaurSurvivors-iOS.tar.gz
           retention-days: 90
 
-      - name: Save Library
-        uses: actions/cache/save@v4
+      # Only cache a Library that produced a working build. Saving after a failure
+      # would persist a half-imported Library for every later run to inherit.
+      - name: Save Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: ${{ steps.cache-macos-library.outputs.cache-primary-key }}
+          target: StandaloneOSX
+          save: true
 
   build-windows:
     name: Build Windows
@@ -200,7 +113,6 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: windows-2022
     env:
-      UNITY_CLI_VERSION: 1.0.0-beta.3
       UNITY_NO_CONSENT_PROMPT: 1
       UNITY_NO_UPDATE_CHECK: 1
 
@@ -211,123 +123,43 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Set Unity Version
-        shell: pwsh
-        run: |
-          $version = (Get-Content ProjectSettings/ProjectVersion.txt | Where-Object { $_ -match '^m_EditorVersion:' }).Split(':')[1].Trim()
-          "UNITY_VERSION=$version" >> $env:GITHUB_ENV
-
-      - name: Install Unity CLI
-        shell: pwsh
-        run: |
-          $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
-          & ([scriptblock]::Create($installer)) -Target "$env:UNITY_CLI_VERSION" -Channel beta
-          "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
-
-      - name: Verify Unity CLI
-        shell: pwsh
-        run: |
-          $version = (unity --version).Trim()
-          if ($version -ne $env:UNITY_CLI_VERSION) {
-            throw "Expected Unity CLI $env:UNITY_CLI_VERSION, found $version."
-          }
-
-      - name: Set Unity Editor install path
-        shell: pwsh
-        run: |
-          $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
-          New-Item -ItemType Directory -Path $editorPath -Force | Out-Null
-          "UNITY_EDITOR_PATH=$editorPath" >> $env:GITHUB_ENV
-          unity install-path --set "$editorPath" --non-interactive
-
-      - name: Install Unity Editor
-        shell: pwsh
-        run: unity install "$env:UNITY_VERSION" --module windows-il2cpp --childModules --accept-eula --yes --non-interactive
-
-      - name: Configure Unity license server
-        shell: pwsh
-        env:
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:LICENSE_SERVER_URL)) {
-            throw 'LICENSE_SERVER_URL is required for Unity floating licenses.'
-          }
-
-          $configDirectory = Join-Path $env:ProgramData 'Unity/config'
-          New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
-          @{
-            licensingServiceBaseUrl = $env:LICENSE_SERVER_URL
-            enableEntitlementLicensing = $true
-            enableFloatingApi = $true
-            clientConnectTimeoutSec = 5
-            clientHandshakeTimeoutSec = 10
-          } | ConvertTo-Json | Set-Content -Path (Join-Path $configDirectory 'services-config.json')
-
-      - name: Restore Library
-        id: cache-windows-library
-        uses: actions/cache/restore@v4
+      - name: Cache Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: Library-StandaloneWindows64-
+          target: StandaloneWindows64
 
-      - name: Acquire Unity floating license
-        shell: pwsh
-        run: |
-          unity license server status --format json
-          unity license activate --floating --non-interactive
+      - name: Set up Unity
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: windows-il2cpp
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build Windows player
-        shell: pwsh
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
-          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
-          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
-          unity build . `
-            --target StandaloneWindows64 `
-            --execute-method Editor.GameBuilder.Build `
-            --output-path Build/StandaloneWindows64/SentaurSurvivors.exe `
-            --editor-version "$env:UNITY_VERSION" `
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" `
-            --non-interactive
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneWindows64
+          output-path: Build/StandaloneWindows64/SentaurSurvivors.exe
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
 
       - name: Return Unity floating license
         if: always()
-        shell: pwsh
-        run: |
-          if (Get-Command unity -ErrorAction SilentlyContinue) {
-            for ($attempt = 1; $attempt -le 3; $attempt++) {
-              unity license return --yes --non-interactive
-              if ($LASTEXITCODE -eq 0) {
-                break
-              }
-
-              if ($attempt -eq 3) {
-                throw "Failed to return Unity floating license after $attempt attempts."
-              }
-
-              Start-Sleep -Seconds 5
-            }
-          }
-
-          $configPath = Join-Path $env:ProgramData 'Unity/config/services-config.json'
-          Remove-Item -Path $configPath -Force -ErrorAction SilentlyContinue
+        uses: ./.github/actions/return-unity-license
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: SentaurSurvivors-StandaloneWindows64
           path: Build/StandaloneWindows64
           retention-days: 90
 
-      - name: Save Library
-        uses: actions/cache/save@v4
+      - name: Save Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: ${{ steps.cache-windows-library.outputs.cache-primary-key }}
+          target: StandaloneWindows64
+          save: true
 
   build-linux:
     name: Build Linux and Android
@@ -335,7 +167,6 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     env:
-      UNITY_CLI_VERSION: 1.0.0-beta.3
       UNITY_NO_CONSENT_PROMPT: 1
       UNITY_NO_UPDATE_CHECK: 1
 
@@ -346,148 +177,60 @@ jobs:
           fetch-depth: 0
           lfs: true
 
-      - name: Set Unity Version
-        shell: bash
-        run: |
-          unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
-          printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
-
-      - name: Install Unity CLI
-        shell: bash
-        env:
-          UNITY_CLI_CHANNEL: beta
-        run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
-
-      - name: Add Unity CLI to PATH
-        shell: bash
-        run: printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Verify Unity CLI
-        shell: bash
-        run: |
-          version=$(unity --version)
-          if [ "$version" != "$UNITY_CLI_VERSION" ]; then
-            printf 'Expected Unity CLI %s, found %s.\n' "$UNITY_CLI_VERSION" "$version" >&2
-            exit 1
-          fi
-
-      - name: Set Unity Editor install path
-        shell: bash
-        run: |
-          editor_path="$RUNNER_TEMP/unity-editors"
-          mkdir -p "$editor_path"
-          printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
-          unity install-path --set "$editor_path" --non-interactive
-
-      - name: Install Unity Editor
-        shell: bash
-        run: unity install "$UNITY_VERSION" --module linux-il2cpp --module android --childModules --accept-eula --yes --non-interactive
-
-      - name: Configure Unity license server
-        shell: bash
-        env:
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
-        run: |
-          if [ -z "$LICENSE_SERVER_URL" ]; then
-            printf '%s\n' 'LICENSE_SERVER_URL is required for Unity floating licenses.' >&2
-            exit 1
-          fi
-
-          sudo install -d /usr/share/unity3d/config
-          jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
-            licensingServiceBaseUrl: $licensing_service_base_url,
-            enableEntitlementLicensing: true,
-            enableFloatingApi: true,
-            clientConnectTimeoutSec: 5,
-            clientHandshakeTimeoutSec: 10
-          }' | sudo tee /usr/share/unity3d/config/services-config.json > /dev/null
-
-      - name: Restore Library
-        id: cache-linux-library
-        uses: actions/cache/restore@v4
+      - name: Cache Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: Library-StandaloneLinux64-
+          target: StandaloneLinux64
 
-      - name: Acquire Unity floating license
-        shell: bash
-        run: |
-          unity license server status --format json || true
-          unity license activate --floating --format json --non-interactive
+      - name: Set up Unity
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: linux-il2cpp android
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build Linux player
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
-          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
-          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
-          unity build . \
-            --target StandaloneLinux64 \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/StandaloneLinux64/SentaurSurvivors \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneLinux64
+          output-path: Build/StandaloneLinux64/SentaurSurvivors
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
 
       - name: Upload Linux Build Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: SentaurSurvivors-StandaloneLinux64
           path: Build/StandaloneLinux64
           retention-days: 90
 
       - name: Build Android player
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          unity build . \
-            --target Android \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/Android/SentaurSurvivors.apk \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
+        uses: ./.github/actions/build-player
+        with:
+          target: Android
+          output-path: Build/Android/SentaurSurvivors.apk
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
 
       - name: Return Unity floating license
         if: always()
-        shell: bash
-        run: |
-          if command -v unity > /dev/null; then
-            for attempt in 1 2 3; do
-              if unity license return --yes --non-interactive; then
-                break
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                printf '%s\n' "Failed to return Unity floating license after $attempt attempts." >&2
-                exit 1
-              fi
-
-              sleep 5
-            done
-          fi
-
-          sudo rm -f /usr/share/unity3d/config/services-config.json
+        uses: ./.github/actions/return-unity-license
 
       - name: Upload Android Build Artifact
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: SentaurSurvivors-Android
           path: Build/Android
           retention-days: 90
 
-      - name: Save Library
-        uses: actions/cache/save@v4
+      - name: Save Unity Library
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: ${{ steps.cache-linux-library.outputs.cache-primary-key }}
+          target: StandaloneLinux64
+          save: true
 
   run-demo:
     name: Run Demo

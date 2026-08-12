@@ -1,5 +1,7 @@
 name: Run Demo Builds
 
+# Note: deliberately no 'workflow_run' trigger on the build workflow. ci.yml calls this
+# workflow directly, and having both would run every demo twice for each build.
 on:
   schedule:
     - cron: '*/50 * * * *' # every 50 minutes
@@ -10,10 +12,6 @@ on:
         required: false
         type: string
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Build Sentaur Survivors"]
-    types:
-      - completed
 
 jobs:
   get-build-run:
@@ -27,13 +25,26 @@ jobs:
         # Scheduled runs use the newest successful main build; callers use their own run.
         id: get-run
         shell: pwsh
+        env:
+          BUILD_RUN_ID: ${{ inputs.build-run-id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ("${{ inputs.build-run-id }}" -ne "") {
-            "run-id=${{ inputs.build-run-id }}" >> $env:GITHUB_OUTPUT
-          } else {
-            $runs = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/runs?branch=main&status=success&per_page=1" -Headers @{Authorization="Bearer ${{ secrets.GITHUB_TOKEN }}"}
-            "run-id=$($runs.workflow_runs[0].id)" >> $env:GITHUB_OUTPUT
+          if (-not [string]::IsNullOrWhiteSpace($env:BUILD_RUN_ID)) {
+            "run-id=$env:BUILD_RUN_ID" >> $env:GITHUB_OUTPUT
+            exit 0
           }
+
+          $uri = 'https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/runs' +
+            '?branch=main&status=success&per_page=1'
+          $runs = Invoke-RestMethod -Uri $uri -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+
+          # Without this the run ID comes out empty and every download below fails with a
+          # confusing "artifact not found" instead of naming the real problem.
+          if (-not $runs.workflow_runs -or $runs.workflow_runs.Count -eq 0) {
+            throw 'No successful build run found on main to take artifacts from.'
+          }
+
+          "run-id=$($runs.workflow_runs[0].id)" >> $env:GITHUB_OUTPUT
 
   run-windows:
     name: Run Windows Build
@@ -44,33 +55,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check out app-runner
-        uses: actions/checkout@v4
+      - name: Set up demo run
+        uses: ./.github/actions/setup-demo-run
         with:
-          repository: getsentry/app-runner
-          ref: 8be06e220d490e527b810f6d073872025bf491b3
-          path: app-runner
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneWindows64
-          path: ./build
+          artifact: SentaurSurvivors-StandaloneWindows64
+          build-run-id: ${{ needs.get-build-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.get-build-run.outputs.run-id }}
 
       - name: Run Build
         timeout-minutes: 10
+        shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
-          $executable = "./build/SentaurSurvivors.exe"
+          $executable = './build/SentaurSurvivors.exe'
           if (-not (Test-Path $executable)) {
             throw "Windows executable not found: $executable"
           }
 
-          pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Windows -ExecutablePath (Resolve-Path $executable).Path
+          ./.github/scripts/run-demo-desktop.ps1 -Platform Windows -ExecutablePath (Resolve-Path $executable).Path
 
       - name: Upload Windows player log
         if: always()
@@ -89,24 +92,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check out app-runner
-        uses: actions/checkout@v4
+      - name: Set up demo run
+        uses: ./.github/actions/setup-demo-run
         with:
-          repository: getsentry/app-runner
-          ref: 8be06e220d490e527b810f6d073872025bf491b3
-          path: app-runner
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneLinux64
-          path: ./build
+          artifact: SentaurSurvivors-StandaloneLinux64
+          build-run-id: ${{ needs.get-build-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.get-build-run.outputs.run-id }}
 
       - name: Run Build
         timeout-minutes: 10
+        shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
@@ -117,6 +112,7 @@ jobs:
           fi
 
           chmod +x "$executable"
+          # The player needs a display server even though nothing watches it.
           xvfb-run pwsh -File .github/scripts/run-demo-desktop.ps1 -Platform Linux -ExecutablePath "$executable"
 
       - name: Upload Linux player log
@@ -136,29 +132,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check out app-runner
-        uses: actions/checkout@v4
+      - name: Set up demo run
+        uses: ./.github/actions/setup-demo-run
         with:
-          repository: getsentry/app-runner
-          ref: 8be06e220d490e527b810f6d073872025bf491b3
-          path: app-runner
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneOSX
+          artifact: SentaurSurvivors-StandaloneOSX
           path: .
+          build-run-id: ${{ needs.get-build-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.get-build-run.outputs.run-id }}
 
       - name: Extract Build
+        shell: bash
         run: |
           mkdir -p build
           tar -xzf SentaurSurvivors-macOS.tar.gz -C build
 
       - name: Run Build
         timeout-minutes: 10
+        shell: bash
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
         run: |
@@ -187,32 +177,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check out app-runner
-        uses: actions/checkout@v4
+      - name: Set up demo run
+        uses: ./.github/actions/setup-demo-run
         with:
-          repository: getsentry/app-runner
-          ref: 8be06e220d490e527b810f6d073872025bf491b3
-          path: app-runner
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: SentaurSurvivors-iOS
+          artifact: SentaurSurvivors-iOS
           path: .
+          build-run-id: ${{ needs.get-build-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.get-build-run.outputs.run-id }}
 
       - name: Extract Build
+        shell: bash
         run: |
           mkdir -p build
           tar -xzf SentaurSurvivors-iOS.tar.gz -C build
 
       - name: Run Build
         timeout-minutes: 15
+        shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-        run: pwsh -File .github/scripts/run-demo-ios.ps1 -AppPath ./build/SentaurSurvivors.app -Dsn "$SENTRY_DSN"
+        run: ./.github/scripts/run-demo-ios.ps1 -AppPath ./build/SentaurSurvivors.app -Dsn $env:SENTRY_DSN
 
       - name: Upload iOS player log
         if: always()
@@ -233,31 +217,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check out app-runner
-        uses: actions/checkout@v4
+      - name: Set up demo run
+        uses: ./.github/actions/setup-demo-run
         with:
-          repository: getsentry/app-runner
-          ref: 8be06e220d490e527b810f6d073872025bf491b3
-          path: app-runner
-
-      - name: Download Build
-        uses: actions/download-artifact@v4
-        with:
-          name: SentaurSurvivors-Android
-          path: ./build
+          artifact: SentaurSurvivors-Android
+          build-run-id: ${{ needs.get-build-run.outputs.run-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.get-build-run.outputs.run-id }}
 
+      # Redroid runs a real Android userspace in a container, which needs the binder
+      # kernel modules the stock runner image does not load.
       - name: Start Redroid container
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y adb aapt "linux-modules-extra-$(uname -r)"
           sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
           sudo modprobe ashmem_linux || true
-          docker run -d --rm --privileged --name redroid -p 5555:5555 redroid/redroid:13.0.0_64only-latest androidboot.redroid_gpu_mode=guest
+          docker run -d --rm --privileged --name redroid -p 5555:5555 \
+            redroid/redroid:13.0.0_64only-latest androidboot.redroid_gpu_mode=guest
 
       - name: Wait for Redroid
+        shell: bash
         run: |
           for attempt in $(seq 1 60); do
             adb connect localhost:5555 > /dev/null 2>&1 || true
@@ -274,9 +254,10 @@ jobs:
 
       - name: Run Build
         timeout-minutes: 15
+        shell: pwsh
         env:
           SENTRY_DSN: ${{ secrets.TEST_DSN }}
-        run: pwsh -File .github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors.apk -Dsn "$SENTRY_DSN"
+        run: ./.github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors.apk -Dsn $env:SENTRY_DSN
 
       - name: Upload Android player log
         if: always()

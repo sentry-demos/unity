@@ -14,6 +14,7 @@ if (-not (Test-Path $ApkPath)) {
 }
 
 Import-Module "$PSScriptRoot/../../app-runner/app-runner/SentryAppRunner.psm1"
+Import-Module "$PSScriptRoot/lib/DemoRun.psm1" -Force
 
 Connect-Device -Platform Adb | Out-Null
 $session = Get-DeviceSession
@@ -26,19 +27,18 @@ try {
 
     $result = Invoke-DeviceApp -ExecutablePath $activity -Arguments @('-e', 'unity', '-demo', '-e', 'dsn', $Dsn)
     $result.Output | Tee-Object -FilePath android-player.log
-    $logs = $result.Output -join "`n"
-    if ($logs -notmatch 'Start Game') {
-        throw 'Android demo did not reach gameplay.'
-    }
 
-    if ($logs -notmatch 'Attempting save_score_to_disk') {
-        throw 'Android demo did not reach the expected native crash.'
-    }
+    # The activity is hosted by the OS, so its exit code says nothing about the crash.
+    Assert-DemoRun -Result $result -Platform 'Android'
 
+    # Relaunch so the SDK picks up the crash from the previous run and sends it.
+    # Without demo mode this time - the app should stay up rather than crash again.
     $session.Provider.Timeouts['run-timeout'] = 10
     $relaunch = Invoke-DeviceApp -ExecutablePath $activity -Arguments @('-e', 'dsn', $Dsn)
     $relaunch.Output | Tee-Object -FilePath android-player.log -Append
     adb shell am force-stop io.sentry
+
+    Assert-CrashReported -Result $relaunch -Platform 'Android'
 }
 finally {
     Disconnect-Device
