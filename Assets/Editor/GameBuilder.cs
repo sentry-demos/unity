@@ -27,6 +27,12 @@ namespace Editor
                 PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 });
             }
 
+            if (target == BuildTarget.iOS)
+            {
+                // CI runs the demo on a simulator.
+                PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
+            }
+
             if (target == BuildTarget.StandaloneLinux64)
             {
                 PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64, false);

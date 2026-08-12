@@ -35,7 +35,6 @@ try {
         -project $xcodeProject `
         -scheme $Scheme `
         -configuration Release `
-        -sdk iphonesimulator `
         -destination 'generic/platform=iOS Simulator' `
         -derivedDataPath (Join-Path $archivePath $Scheme) `
         CODE_SIGNING_ALLOWED=NO `
