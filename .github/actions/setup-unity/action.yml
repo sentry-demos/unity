@@ -1,8 +1,8 @@
 name: Set up Unity
 description: >-
-  Installs the Unity CLI and Editor, points the licensing client at the floating
-  license server, and acquires a license. Pair with the 'return-unity-license'
-  action so the license goes back even when the build fails.
+  Installs the Unity CLI and Editor and points the licensing client at the floating
+  license server. The editor takes and releases a seat by itself, so there is no
+  separate acquire or return step.
 
 inputs:
   modules:
@@ -84,6 +84,11 @@ runs:
           throw "Unity Editor installation failed with exit code $LASTEXITCODE."
         }
 
+    # Writing this config is all the licensing setup there is. With enableFloatingApi
+    # set, the editor leases a seat from the server on start-up and releases it on
+    # exit, so there is nothing to activate or hand back - a licensing problem shows
+    # up as a build failure. sentry-unity runs a full target x Unity-version matrix
+    # in parallel off nothing but this file.
     - name: Configure Unity license server
       shell: pwsh
       env:
@@ -117,14 +122,4 @@ runs:
         } else {
           sudo mkdir -p $configDirectory
           $config | sudo tee $configPath > $null
-        }
-
-    - name: Acquire Unity floating license
-      shell: pwsh
-      run: |
-        # Status is advisory - a server that does not answer 'status' can still hand out a license.
-        unity license server status --format json
-        unity license activate --floating --format json --non-interactive
-        if ($LASTEXITCODE -ne 0) {
-          throw "Failed to acquire a Unity floating license (exit code $LASTEXITCODE)."
         }

@@ -9,8 +9,10 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
-# One floating license is shared across the whole org, so the build jobs below are
-# chained rather than run in parallel and only one workflow run holds it at a time.
+# The build jobs are chained and only one run holds this group at a time, to keep
+# demand on the shared floating-license server predictable. The editor leases and
+# releases seats by itself, so this can be relaxed once the seat count is known to
+# cover the three build jobs running concurrently.
 concurrency:
   group: unity-floating-license
   cancel-in-progress: true
@@ -136,12 +138,6 @@ jobs:
           tar -czf SentaurSurvivors-iOS.tar.gz \
             -C Build/iOS/archive/Unity-iPhone/Build/Products/Release-iphonesimulator SentaurSurvivors.app
 
-      # Returning the license is skipped along with the rest of Unity on a full cache
-      # hit - there is none to return, and setup-unity never ran.
-      - name: Return Unity floating license
-        if: always() && steps.unity-needed.outputs.result == 'true'
-        uses: ./.github/actions/return-unity-license
-
       - name: Upload macOS Build Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -238,10 +234,6 @@ jobs:
           sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
           sentry-org: ${{ secrets.TEST_ORG }}
           sentry-project: ${{ secrets.TEST_PROJECT }}
-
-      - name: Return Unity floating license
-        if: always() && steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/return-unity-license
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -362,10 +354,6 @@ jobs:
           sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
           sentry-org: ${{ secrets.TEST_ORG }}
           sentry-project: ${{ secrets.TEST_PROJECT }}
-
-      - name: Return Unity floating license
-        if: always() && steps.unity-needed.outputs.result == 'true'
-        uses: ./.github/actions/return-unity-license
 
       - name: Upload Linux Build Artifact
         uses: actions/upload-artifact@v4
