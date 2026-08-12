@@ -47,8 +47,11 @@ try {
 
     # Relaunch so the SDK picks up the crash from the previous run and sends it.
     # Without demo mode this time - the app should stay up rather than crash again.
+    # The app never exits on its own here, so this timeout is how long it gets to run.
+    # It has to cover simulator start-up (~30s) plus the crash upload, and console-pty
+    # only flushes the output once the process ends - too short and we capture nothing.
     $env:SIMCTL_CHILD_SENTRY_DEMO = $null
-    $session.Provider.Timeouts['run-timeout'] = 10
+    $session.Provider.Timeouts['run-timeout'] = 90
     $relaunch = Invoke-DeviceApp -ExecutablePath $bundleId
     $relaunch.Output | Tee-Object -FilePath ios-player.log -Append
     & xcrun simctl terminate $session.Identifier $bundleId 2>&1 | Out-Null
