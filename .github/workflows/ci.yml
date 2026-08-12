@@ -14,8 +14,188 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-macos:
+    name: Build macOS and iOS
+    runs-on: macos-15
+    env:
+      UNITY_CLI_VERSION: 1.0.0-beta.3
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Set Unity Version
+        shell: bash
+        run: |
+          unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
+          printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
+
+      - name: Install Unity CLI
+        shell: bash
+        env:
+          UNITY_CLI_CHANNEL: beta
+        run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
+
+      - name: Add Unity CLI to PATH
+        shell: bash
+        run: printf '%s\n' "$HOME/.unity/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Unity CLI
+        shell: bash
+        run: |
+          version=$(unity --version)
+          if [ "$version" != "$UNITY_CLI_VERSION" ]; then
+            printf 'Expected Unity CLI %s, found %s.\n' "$UNITY_CLI_VERSION" "$version" >&2
+            exit 1
+          fi
+
+      - name: Set Unity Editor install path
+        shell: bash
+        run: |
+          editor_path="$RUNNER_TEMP/unity-editors"
+          mkdir -p "$editor_path"
+          printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
+          unity install-path --set "$editor_path" --non-interactive
+
+      - name: Install Unity Editor
+        shell: bash
+        run: unity install "$UNITY_VERSION" --module mac-il2cpp --module ios --childModules --accept-eula --yes --non-interactive
+
+      - name: Configure Unity license server
+        shell: bash
+        env:
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
+        run: |
+          if [ -z "$LICENSE_SERVER_URL" ]; then
+            printf '%s\n' 'LICENSE_SERVER_URL is required for Unity floating licenses.' >&2
+            exit 1
+          fi
+
+          sudo mkdir -p "/Library/Application Support/Unity/config"
+          jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
+            licensingServiceBaseUrl: $licensing_service_base_url,
+            enableEntitlementLicensing: true,
+            enableFloatingApi: true,
+            clientConnectTimeoutSec: 5,
+            clientHandshakeTimeoutSec: 10
+          }' | sudo tee "/Library/Application Support/Unity/config/services-config.json" > /dev/null
+
+      - name: Restore Library
+        id: cache-macos-library
+        uses: actions/cache/restore@v4
+        with:
+          path: Library
+          key: Library-StandaloneOSX-
+
+      - name: Acquire Unity floating license
+        shell: bash
+        run: |
+          unity license server status --format json || true
+          unity license activate --floating --format json --non-interactive
+
+      - name: Build macOS player
+        shell: bash
+        env:
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_LOG_LEVEL: debug
+        run: |
+          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
+          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
+          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
+          unity build . \
+            --target StandaloneOSX \
+            --execute-method Editor.GameBuilder.Build \
+            --output-path Build/StandaloneOSX/SentaurSurvivors.app \
+            --editor-version "$UNITY_VERSION" \
+            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
+            --non-interactive
+
+      # Tar the bundle: upload-artifact drops the executable bit and flattens the
+      # symlinks that the .app relies on to launch.
+      - name: Create macOS archive
+        if: success()
+        shell: bash
+        run: tar -czf SentaurSurvivors-macOS.tar.gz -C Build/StandaloneOSX SentaurSurvivors.app
+
+      - name: Upload macOS Build Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: SentaurSurvivors-StandaloneOSX
+          path: SentaurSurvivors-macOS.tar.gz
+          retention-days: 90
+
+      - name: Build iOS Xcode project
+        shell: bash
+        env:
+          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_LOG_LEVEL: debug
+        run: |
+          unity build . \
+            --target iOS \
+            --execute-method Editor.GameBuilder.Build \
+            --output-path Build/iOS \
+            --editor-version "$UNITY_VERSION" \
+            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
+            --non-interactive
+
+      # Compiling no longer needs the editor, but the license is returned in a later
+      # step so a failure here still releases it.
+      - name: Compile iOS Xcode project
+        shell: pwsh
+        run: ./.github/scripts/compile-xcode-project.ps1 -ProjectPath Build/iOS
+
+      - name: Return Unity floating license
+        if: always()
+        shell: bash
+        run: |
+          if command -v unity > /dev/null; then
+            for attempt in 1 2 3; do
+              if unity license return --yes --non-interactive; then
+                break
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                printf '%s\n' "Failed to return Unity floating license after $attempt attempts." >&2
+                exit 1
+              fi
+
+              sleep 5
+            done
+          fi
+
+          sudo rm -f "/Library/Application Support/Unity/config/services-config.json"
+
+      - name: Create iOS archive
+        if: success()
+        shell: bash
+        run: |
+          tar -czf SentaurSurvivors-iOS.tar.gz \
+            -C Build/iOS/archive/Unity-iPhone/Build/Products/Release-iphonesimulator SentaurSurvivors.app
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: SentaurSurvivors-iOS
+          path: SentaurSurvivors-iOS.tar.gz
+          retention-days: 90
+
+      - name: Save Library
+        uses: actions/cache/save@v4
+        with:
+          path: Library
+          key: ${{ steps.cache-macos-library.outputs.cache-primary-key }}
+
   build-windows:
     name: Build Windows
+    needs: build-macos
+    if: always()
     runs-on: windows-2022
     env:
       UNITY_CLI_VERSION: 1.0.0-beta.3
@@ -306,186 +486,6 @@ jobs:
         with:
           path: Library
           key: ${{ steps.cache-linux-library.outputs.cache-primary-key }}
-
-  build-macos:
-    name: Build macOS and iOS
-    needs: build-linux
-    if: always()
-    runs-on: macos-15
-    env:
-      UNITY_CLI_VERSION: 1.0.0-beta.3
-      UNITY_NO_CONSENT_PROMPT: 1
-      UNITY_NO_UPDATE_CHECK: 1
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-
-      - name: Set Unity Version
-        shell: bash
-        run: |
-          unity_version=$(awk '/^m_EditorVersion:/{print $2}' ProjectSettings/ProjectVersion.txt)
-          printf 'UNITY_VERSION=%s\n' "$unity_version" >> "$GITHUB_ENV"
-
-      - name: Install Unity CLI
-        shell: bash
-        env:
-          UNITY_CLI_CHANNEL: beta
-        run: curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
-
-      - name: Add Unity CLI to PATH
-        shell: bash
-        run: printf '%s\n' "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Verify Unity CLI
-        shell: bash
-        run: |
-          version=$(unity --version)
-          if [ "$version" != "$UNITY_CLI_VERSION" ]; then
-            printf 'Expected Unity CLI %s, found %s.\n' "$UNITY_CLI_VERSION" "$version" >&2
-            exit 1
-          fi
-
-      - name: Set Unity Editor install path
-        shell: bash
-        run: |
-          editor_path="$RUNNER_TEMP/unity-editors"
-          mkdir -p "$editor_path"
-          printf 'UNITY_EDITOR_PATH=%s\n' "$editor_path" >> "$GITHUB_ENV"
-          unity install-path --set "$editor_path" --non-interactive
-
-      - name: Install Unity Editor
-        shell: bash
-        run: unity install "$UNITY_VERSION" --module mac-il2cpp --module ios --childModules --accept-eula --yes --non-interactive
-
-      - name: Configure Unity license server
-        shell: bash
-        env:
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL }}
-        run: |
-          if [ -z "$LICENSE_SERVER_URL" ]; then
-            printf '%s\n' 'LICENSE_SERVER_URL is required for Unity floating licenses.' >&2
-            exit 1
-          fi
-
-          sudo mkdir -p "/Library/Application Support/Unity/config"
-          jq -n --arg licensing_service_base_url "$LICENSE_SERVER_URL" '{
-            licensingServiceBaseUrl: $licensing_service_base_url,
-            enableEntitlementLicensing: true,
-            enableFloatingApi: true,
-            clientConnectTimeoutSec: 5,
-            clientHandshakeTimeoutSec: 10
-          }' | sudo tee "/Library/Application Support/Unity/config/services-config.json" > /dev/null
-
-      - name: Restore Library
-        id: cache-macos-library
-        uses: actions/cache/restore@v4
-        with:
-          path: Library
-          key: Library-StandaloneOSX-
-
-      - name: Acquire Unity floating license
-        shell: bash
-        run: |
-          unity license server status --format json || true
-          unity license activate --floating --format json --non-interactive
-
-      - name: Build macOS player
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          # The sentry-cli credentials go through --args, not the environment. sentry-cli prefers
-          # SENTRY_AUTH_TOKEN from the environment over the sentry.properties file the SDK writes for
-          # org/project, and refuses to mix configuration sources - which breaks the symbol upload.
-          unity build . \
-            --target StandaloneOSX \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/StandaloneOSX/SentaurSurvivors.app \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
-
-      # Tar the bundle: upload-artifact drops the executable bit and flattens the
-      # symlinks that the .app relies on to launch.
-      - name: Create macOS archive
-        if: success()
-        shell: bash
-        run: tar -czf SentaurSurvivors-macOS.tar.gz -C Build/StandaloneOSX SentaurSurvivors.app
-
-      - name: Upload macOS Build Artifact
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: SentaurSurvivors-StandaloneOSX
-          path: SentaurSurvivors-macOS.tar.gz
-          retention-days: 90
-
-      - name: Build iOS Xcode project
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
-          SENTRY_LOG_LEVEL: debug
-        run: |
-          unity build . \
-            --target iOS \
-            --execute-method Editor.GameBuilder.Build \
-            --output-path Build/iOS \
-            --editor-version "$UNITY_VERSION" \
-            --args "-sentryAuthToken ${{ secrets.TEST_AUTH_TOKEN }} -sentryOrg ${{ secrets.TEST_ORG }} -sentryProject ${{ secrets.TEST_PROJECT }}" \
-            --non-interactive
-
-      # Compiling no longer needs the editor, but the license is returned in a later
-      # step so a failure here still releases it.
-      - name: Compile iOS Xcode project
-        shell: pwsh
-        run: ./.github/scripts/compile-xcode-project.ps1 -ProjectPath Build/iOS
-
-      - name: Return Unity floating license
-        if: always()
-        shell: bash
-        run: |
-          if command -v unity > /dev/null; then
-            for attempt in 1 2 3; do
-              if unity license return --yes --non-interactive; then
-                break
-              fi
-
-              if [ "$attempt" -eq 3 ]; then
-                printf '%s\n' "Failed to return Unity floating license after $attempt attempts." >&2
-                exit 1
-              fi
-
-              sleep 5
-            done
-          fi
-
-          sudo rm -f "/Library/Application Support/Unity/config/services-config.json"
-
-      - name: Create iOS archive
-        if: success()
-        shell: bash
-        run: |
-          tar -czf SentaurSurvivors-iOS.tar.gz \
-            -C Build/iOS/archive/Unity-iPhone/Build/Products/Release-iphonesimulator SentaurSurvivors.app
-
-      - name: Upload iOS Build Artifact
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: SentaurSurvivors-iOS
-          path: SentaurSurvivors-iOS.tar.gz
-          retention-days: 90
-
-      - name: Save Library
-        uses: actions/cache/save@v4
-        with:
-          path: Library
-          key: ${{ steps.cache-macos-library.outputs.cache-primary-key }}
 
   run-demo:
     name: Run Demo
