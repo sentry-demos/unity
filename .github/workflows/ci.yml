@@ -30,18 +30,71 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Fingerprint macOS build
+        id: fingerprint-macos
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneOSX
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
+
+      - name: Fingerprint iOS build
+        id: fingerprint-ios
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: iOS
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
+
+      # The archives are cached rather than the build directories: they are what the
+      # artifacts are made of, and taring first avoids the symlink and permission
+      # damage a cache round trip does to a .app bundle.
+      - name: Restore cached macOS player
+        id: cached-macos
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-macos.outputs.key }}
+          path: SentaurSurvivors-macOS.tar.gz
+
+      - name: Restore cached iOS player
+        id: cached-ios
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-ios.outputs.key }}
+          path: SentaurSurvivors-iOS.tar.gz
+
+      # Both players come out of one Unity session, so the editor is only needed when
+      # at least one of them missed the cache.
+      - name: Determine whether Unity is needed
+        id: unity-needed
+        shell: pwsh
+        run: |
+          $needed = '${{ steps.cached-macos.outputs.hit }}' -ne 'true' -or
+                    '${{ steps.cached-ios.outputs.hit }}' -ne 'true'
+          "result=$($needed.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($needed) {
+            Write-Host 'Building: at least one player was not cached.'
+          } else {
+            Write-Host 'Both players restored from cache - skipping Unity entirely.'
+          }
+
       - name: Cache Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneOSX
 
       - name: Set up Unity
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/setup-unity
         with:
           modules: mac-il2cpp ios
           license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build macOS player
+        if: steps.cached-macos.outputs.hit != 'true'
         uses: ./.github/actions/build-player
         with:
           target: StandaloneOSX
@@ -54,17 +107,12 @@ jobs:
       # Tar the bundle: upload-artifact drops the executable bit and flattens the
       # symlinks that the .app relies on to launch.
       - name: Create macOS archive
+        if: steps.cached-macos.outputs.hit != 'true'
         shell: bash
         run: tar -czf SentaurSurvivors-macOS.tar.gz -C Build/StandaloneOSX SentaurSurvivors.app
 
-      - name: Upload macOS Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneOSX
-          path: SentaurSurvivors-macOS.tar.gz
-          retention-days: 90
-
       - name: Build iOS Xcode project
+        if: steps.cached-ios.outputs.hit != 'true'
         uses: ./.github/actions/build-player
         with:
           target: iOS
@@ -77,18 +125,29 @@ jobs:
       # Compiling no longer needs the editor, but the license is returned in a later
       # step so a failure here still releases it.
       - name: Compile iOS Xcode project
+        if: steps.cached-ios.outputs.hit != 'true'
         shell: pwsh
         run: ./.github/scripts/compile-xcode-project.ps1 -ProjectPath Build/iOS
 
-      - name: Return Unity floating license
-        if: always()
-        uses: ./.github/actions/return-unity-license
-
       - name: Create iOS archive
+        if: steps.cached-ios.outputs.hit != 'true'
         shell: bash
         run: |
           tar -czf SentaurSurvivors-iOS.tar.gz \
             -C Build/iOS/archive/Unity-iPhone/Build/Products/Release-iphonesimulator SentaurSurvivors.app
+
+      # Returning the license is skipped along with the rest of Unity on a full cache
+      # hit - there is none to return, and setup-unity never ran.
+      - name: Return Unity floating license
+        if: always() && steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/return-unity-license
+
+      - name: Upload macOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneOSX
+          path: SentaurSurvivors-macOS.tar.gz
+          retention-days: 90
 
       - name: Upload iOS Build Artifact
         uses: actions/upload-artifact@v4
@@ -97,9 +156,26 @@ jobs:
           path: SentaurSurvivors-iOS.tar.gz
           retention-days: 90
 
+      - name: Cache macOS player
+        if: steps.cached-macos.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-macos.outputs.key }}
+          path: SentaurSurvivors-macOS.tar.gz
+          save: true
+
+      - name: Cache iOS player
+        if: steps.cached-ios.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-ios.outputs.key }}
+          path: SentaurSurvivors-iOS.tar.gz
+          save: true
+
       # Only cache a Library that produced a working build. Saving after a failure
       # would persist a half-imported Library for every later run to inherit.
       - name: Save Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneOSX
@@ -123,18 +199,37 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Fingerprint Windows build
+        id: fingerprint
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneWindows64
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
+
+      - name: Restore cached Windows player
+        id: cached
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+
       - name: Cache Unity Library
+        if: steps.cached.outputs.hit != 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneWindows64
 
       - name: Set up Unity
+        if: steps.cached.outputs.hit != 'true'
         uses: ./.github/actions/setup-unity
         with:
           modules: windows-il2cpp
           license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build Windows player
+        if: steps.cached.outputs.hit != 'true'
         uses: ./.github/actions/build-player
         with:
           target: StandaloneWindows64
@@ -145,7 +240,7 @@ jobs:
           sentry-project: ${{ secrets.TEST_PROJECT }}
 
       - name: Return Unity floating license
-        if: always()
+        if: always() && steps.cached.outputs.hit != 'true'
         uses: ./.github/actions/return-unity-license
 
       - name: Upload Build Artifact
@@ -155,7 +250,16 @@ jobs:
           path: Build/StandaloneWindows64
           retention-days: 90
 
+      - name: Cache Windows player
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+          save: true
+
       - name: Save Unity Library
+        if: steps.cached.outputs.hit != 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneWindows64
@@ -177,18 +281,68 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Fingerprint Linux build
+        id: fingerprint-linux
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneLinux64
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
+
+      - name: Fingerprint Android build
+        id: fingerprint-android
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: Android
+          sentry-dsn: ${{ secrets.TEST_DSN }}
+          sentry-org: ${{ secrets.TEST_ORG }}
+          sentry-project: ${{ secrets.TEST_PROJECT }}
+
+      - name: Restore cached Linux player
+        id: cached-linux
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-linux.outputs.key }}
+          path: Build/StandaloneLinux64
+
+      - name: Restore cached Android player
+        id: cached-android
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-android.outputs.key }}
+          path: Build/Android
+
+      # Both players come out of one Unity session, so the editor is only needed when
+      # at least one of them missed the cache.
+      - name: Determine whether Unity is needed
+        id: unity-needed
+        shell: pwsh
+        run: |
+          $needed = '${{ steps.cached-linux.outputs.hit }}' -ne 'true' -or
+                    '${{ steps.cached-android.outputs.hit }}' -ne 'true'
+          "result=$($needed.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($needed) {
+            Write-Host 'Building: at least one player was not cached.'
+          } else {
+            Write-Host 'Both players restored from cache - skipping Unity entirely.'
+          }
+
       - name: Cache Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneLinux64
 
       - name: Set up Unity
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/setup-unity
         with:
           modules: linux-il2cpp android
           license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
       - name: Build Linux player
+        if: steps.cached-linux.outputs.hit != 'true'
         uses: ./.github/actions/build-player
         with:
           target: StandaloneLinux64
@@ -198,14 +352,8 @@ jobs:
           sentry-org: ${{ secrets.TEST_ORG }}
           sentry-project: ${{ secrets.TEST_PROJECT }}
 
-      - name: Upload Linux Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneLinux64
-          path: Build/StandaloneLinux64
-          retention-days: 90
-
       - name: Build Android player
+        if: steps.cached-android.outputs.hit != 'true'
         uses: ./.github/actions/build-player
         with:
           target: Android
@@ -216,8 +364,15 @@ jobs:
           sentry-project: ${{ secrets.TEST_PROJECT }}
 
       - name: Return Unity floating license
-        if: always()
+        if: always() && steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/return-unity-license
+
+      - name: Upload Linux Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneLinux64
+          path: Build/StandaloneLinux64
+          retention-days: 90
 
       - name: Upload Android Build Artifact
         uses: actions/upload-artifact@v4
@@ -226,7 +381,24 @@ jobs:
           path: Build/Android
           retention-days: 90
 
+      - name: Cache Linux player
+        if: steps.cached-linux.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-linux.outputs.key }}
+          path: Build/StandaloneLinux64
+          save: true
+
+      - name: Cache Android player
+        if: steps.cached-android.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-android.outputs.key }}
+          path: Build/Android
+          save: true
+
       - name: Save Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/cache-unity-library
         with:
           target: StandaloneLinux64

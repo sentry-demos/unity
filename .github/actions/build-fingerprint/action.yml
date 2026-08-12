@@ -1,0 +1,70 @@
+name: Build fingerprint
+description: >-
+  Computes the cache key identifying a built player. Anything that changes the
+  player - or where its debug symbols were uploaded - has to be part of this key,
+  otherwise a cached build gets reused when it should not be.
+
+inputs:
+  target:
+    description: Unity build target the fingerprint is for, e.g. StandaloneOSX.
+    required: true
+  sentry-dsn:
+    description: DSN the build is associated with. See the note on symbols below.
+    required: true
+  sentry-org:
+    description: Sentry organization the debug symbols are uploaded to.
+    required: true
+  sentry-project:
+    description: Sentry project the debug symbols are uploaded to.
+    required: true
+
+outputs:
+  key:
+    description: Cache key for this build.
+    value: ${{ steps.fingerprint.outputs.key }}
+
+runs:
+  using: composite
+  steps:
+    # Hash the Sentry destination rather than embedding it: the key is visible in
+    # logs and the cache UI, and the DSN and org/project are secrets.
+    - name: Hash Sentry destination
+      id: destination
+      shell: pwsh
+      env:
+        SENTRY_DSN: ${{ inputs.sentry-dsn }}
+        SENTRY_ORG: ${{ inputs.sentry-org }}
+        SENTRY_PROJECT: ${{ inputs.sentry-project }}
+      run: |
+        # Uploading debug symbols is a side effect of the build: sentry.properties
+        # points sentry-cli at one specific org/project, and the DSN selects which
+        # project the player's events land in. Reusing a player built against a
+        # different destination would leave its symbols in the wrong project and
+        # its stack traces unsymbolicated, so all three belong in the key.
+        $destination = "$env:SENTRY_DSN|$env:SENTRY_ORG|$env:SENTRY_PROJECT"
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($destination)
+        $stream = [System.IO.MemoryStream]::new($bytes)
+        $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.Substring(0, 16).ToLower()
+        "hash=$hash" >> $env:GITHUB_OUTPUT
+
+    - name: Compose cache key
+      id: fingerprint
+      shell: pwsh
+      run: |
+        # hashFiles covers everything the player is built from. Assets and
+        # ProjectSettings are the project itself; the package lock pins every
+        # dependency including the Sentry SDK revision; GameBuilder and the build
+        # action decide how the player is produced.
+        $sources = '${{ hashFiles(
+          'Assets/**',
+          'ProjectSettings/**',
+          'Packages/manifest.json',
+          'Packages/packages-lock.json',
+          '.github/actions/build-player/action.yml'
+        ) }}'
+
+        if ([string]::IsNullOrWhiteSpace($sources)) {
+          throw 'Failed to hash the build sources - refusing to cache against an empty key.'
+        }
+
+        "key=build-${{ inputs.target }}-$sources-${{ steps.destination.outputs.hash }}" >> $env:GITHUB_OUTPUT
