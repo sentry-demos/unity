@@ -84,11 +84,6 @@ runs:
           throw "Unity Editor installation failed with exit code $LASTEXITCODE."
         }
 
-    # Writing this config is all the licensing setup there is. With enableFloatingApi
-    # set, the editor leases a seat from the server on start-up and releases it on
-    # exit, so there is nothing to activate or hand back - a licensing problem shows
-    # up as a build failure. sentry-unity runs a full target x Unity-version matrix
-    # in parallel off nothing but this file.
     - name: Configure Unity license server
       shell: pwsh
       env:

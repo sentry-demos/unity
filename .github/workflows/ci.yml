@@ -9,10 +9,7 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
-# The build jobs are chained and only one run holds this group at a time, to keep
-# demand on the shared floating-license server predictable. The editor leases and
-# releases seats by itself, so this can be relaxed once the seat count is known to
-# cover the three build jobs running concurrently.
+# The build jobs are chained and only one run holds this group at a time.
 concurrency:
   group: unity-floating-license
   cancel-in-progress: true
@@ -124,8 +121,6 @@ jobs:
           sentry-org: ${{ secrets.TEST_ORG }}
           sentry-project: ${{ secrets.TEST_PROJECT }}
 
-      # Compiling no longer needs the editor, but the license is returned in a later
-      # step so a failure here still releases it.
       - name: Compile iOS Xcode project
         if: steps.cached-ios.outputs.hit != 'true'
         shell: pwsh
@@ -168,8 +163,6 @@ jobs:
           path: SentaurSurvivors-iOS.tar.gz
           save: true
 
-      # Only cache a Library that produced a working build. Saving after a failure
-      # would persist a half-imported Library for every later run to inherit.
       - name: Save Unity Library
         if: steps.unity-needed.outputs.result == 'true'
         uses: ./.github/actions/cache-unity-library
