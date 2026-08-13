@@ -46,3 +46,8 @@ try {
 } finally {
     Disconnect-Device
 }
+
+# The player is meant to die in a native crash, so it always leaves a non-zero
+# $LASTEXITCODE behind. Failures leave through the throws above, never through the
+# exit code, so say so explicitly rather than inheriting the crash's status.
+exit 0

@@ -56,3 +56,7 @@ try {
 finally {
     Disconnect-Device
 }
+
+# Failures leave through the throws above, never through the exit code. Without this
+# the script would inherit whatever the last command happened to return.
+exit 0
