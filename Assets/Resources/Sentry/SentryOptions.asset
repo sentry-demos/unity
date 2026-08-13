@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SentryOptions
   m_EditorClassIdentifier: 
   <Enabled>k__BackingField: 1
-  <Dsn>k__BackingField:
+  <Dsn>k__BackingField: https://f63294372561fcf117487d0a59fee5cd@o447951.ingest.us.sentry.io/4508846594785280
   <CaptureInEditor>k__BackingField: 1
   <EnableErrorEventThrottling>k__BackingField: 0
   <ThrottleDedupeWindow>k__BackingField: 1000
@@ -82,11 +82,11 @@ MonoBehaviour:
   <Il2CppLineNumberSupportEnabled>k__BackingField: 1
   <EnableMetrics>k__BackingField: 1
   <Experimental>k__BackingField:
-    <MacosBackend>k__BackingField: 0
-    <WindowsBackend>k__BackingField: 0
+    <MacosBackend>k__BackingField: 1
+    <WindowsBackend>k__BackingField: 1
     <LinuxBackend>k__BackingField: 1
     <EnableNativeAppHangTracking>k__BackingField: 1
   <OptionsConfiguration>k__BackingField: {fileID: 11400000, guid: 25178abd783614c03b050025b14a05bb, type: 2}
   <Debug>k__BackingField: 1
   <DebugOnlyInEditor>k__BackingField: 0
-  <DiagnosticLevel>k__BackingField: 1
+  <DiagnosticLevel>k__BackingField: 0
