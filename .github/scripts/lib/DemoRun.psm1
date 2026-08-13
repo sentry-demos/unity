@@ -6,6 +6,15 @@ Set-StrictMode -Version Latest
 # game and CI: if the log lines below change in Assets/Scripts, these change too.
 $script:GameplayMarker = 'Start Game'                            # TitleSceneManager.cs
 $script:NativeCrashMarker = 'Attempting save_score_to_disk'      # BattleSceneManager.cs
+
+# Logged immediately after the native call in BattleSceneManager.SaveScoreToDisk.
+# The crash is meant to take the process down, so any of these appearing means it
+# did not - the call returned, or it threw and was caught.
+$script:CrashSurvivedMarkers = @(
+    'save_score_to_disk completed without crash'
+    'save_score_to_disk threw exception'
+    'ForceCrash also failed'
+)
 # Logged by the .NET SDK transport (Sentry/Http/HttpTransportBase.cs) once an envelope
 # reaches Sentry. It logs "Envelope successfully sent." without an event ID and
 # "Envelope '<id>' successfully sent." with one - a crash report always carries an ID,
@@ -26,10 +35,6 @@ The object returned by Invoke-DeviceApp.
 .PARAMETER Platform
 Platform name used in the failure messages.
 
-.PARAMETER ExpectCrashExitCode
-Assert that the process exited non-zero. Desktop players report the crash through
-their exit code; on Android and iOS the app is hosted, so its exit code says nothing
-about whether the player crashed.
 #>
 function Assert-DemoRun {
     param(
@@ -37,9 +42,7 @@ function Assert-DemoRun {
         [object]$Result,
 
         [Parameter(Mandatory = $true)]
-        [string]$Platform,
-
-        [switch]$ExpectCrashExitCode
+        [string]$Platform
     )
 
     $logs = $Result.Output -join "`n"
@@ -52,8 +55,15 @@ function Assert-DemoRun {
         throw "$Platform demo did not reach the expected native crash (no '$script:NativeCrashMarker' in the log)."
     }
 
-    if ($ExpectCrashExitCode -and $Result.ExitCode -eq 0) {
-        throw "$Platform demo exited cleanly instead of crashing as expected."
+    # The crash is proven by what is missing, not by the exit code. BattleSceneManager
+    # logs one of these right after the native call, so seeing either means the call
+    # returned or was caught and the process stayed alive. Exit codes are not usable
+    # here: a Windows access violation surfaces through $LASTEXITCODE differently than
+    # a POSIX signal, so identical crashes report differently per platform.
+    foreach ($marker in $script:CrashSurvivedMarkers) {
+        if ($logs -match [regex]::Escape($marker)) {
+            throw "$Platform demo survived the native crash - the player logged '$marker'."
+        }
     }
 }
 

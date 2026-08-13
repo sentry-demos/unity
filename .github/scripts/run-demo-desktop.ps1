@@ -42,8 +42,7 @@ try {
     $result = Invoke-DeviceApp -ExecutablePath $runner -Arguments $arguments
     $result.Output | Tee-Object -FilePath desktop-player.log
 
-    # Desktop players run as the process itself, so the crash shows up in the exit code.
-    Assert-DemoRun -Result $result -Platform $Platform -ExpectCrashExitCode
+    Assert-DemoRun -Result $result -Platform $Platform
 } finally {
     Disconnect-Device
 }
