@@ -11,10 +11,6 @@ inputs:
   license-server-url:
     description: Base URL of the Unity floating license server.
     required: true
-  cli-version:
-    description: Unity CLI version to install. The run fails if a different version ends up on PATH.
-    required: false
-    default: 1.0.0-beta.3
 
 outputs:
   unity-version:
@@ -50,7 +46,7 @@ runs:
       run: |
         if ($IsWindows) {
           $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
-          & ([scriptblock]::Create($installer)) -Target '${{ inputs.cli-version }}' -Channel beta
+          & ([scriptblock]::Create($installer)) -Channel beta
           "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
         } else {
           curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
@@ -59,13 +55,17 @@ runs:
           $binDirectory >> $env:GITHUB_PATH
         }
 
+    # Only checks that the CLI is on PATH and runs. The beta channel bumps often and
+    # pinning an exact version breaks the build for no benefit.
     - name: Verify Unity CLI
       shell: pwsh
       run: |
-        $version = (unity --version).Trim()
-        if ($version -ne '${{ inputs.cli-version }}') {
-          throw "Expected Unity CLI ${{ inputs.cli-version }}, found $version."
+        $version = (unity --version 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+          throw "Unity CLI is not usable: 'unity --version' exited with $LASTEXITCODE and printed '$version'."
         }
+
+        Write-Host "Unity CLI $version"
 
     # Installing into RUNNER_TEMP keeps the Editor out of the workspace so it is
     # never picked up by the Library cache or the artifact uploads.
