@@ -49,6 +49,15 @@ internal class UpgradeManager : SceneSingleton<UpgradeManager>
     {
         upgradePath.LevelUp(); // level up the selected upgrade
 
+        // The type name, not the serialised Title: the title is display copy and can be
+        // re-worded, which would silently split the metric in two.
+        GameMetrics.Count(
+            GameMetrics.UpgradeSelected,
+            1,
+            (GameMetrics.PathKey, upgradePath.GetType().Name),
+            (GameMetrics.NewLevelKey, upgradePath.Level)
+        );
+
         if (upgradePath.IsMaxLevel())
         {
             // take the upgrade out of the pool if it's maxed out

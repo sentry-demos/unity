@@ -35,6 +35,10 @@ public class PickupBase : MonoBehaviour
 
             Player.Instance.SpawnPlayerText(GetEffectText());
 
+            // Each pickup is its own component, so the type name is the pickup's name and
+            // the attribute stays bounded by the class list.
+            GameMetrics.RecordPickupCollected(GetType().Name);
+
             // Read the icon off this object before destroying it
             var collected = new PickupCollected(_scoreValue, Icon, _effectDuration);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Sentry.Unity;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -54,6 +55,7 @@ public class BattleSceneManager : MonoBehaviour
     private LevelProgression _progression;
     private DifficultyCurve _difficulty;
     private SpawnDirector _spawnDirector;
+    private BattleMetrics _metrics;
 
     private enum GameState
     {
@@ -89,6 +91,7 @@ public class BattleSceneManager : MonoBehaviour
         _progression = new LevelProgression(_tuning.LevelMilestones, _currentLevel, _xp);
         _difficulty = new DifficultyCurve(DifficultyCurve.Settings.From(_tuning));
         _spawnDirector = new SpawnDirector();
+        _metrics = new BattleMetrics();
         _enemySpawner.Initialize(_difficulty, new WaveFormation(_tuning));
 
         InputSystem.actions.FindActionMap("Player").Enable();
@@ -105,6 +108,8 @@ public class BattleSceneManager : MonoBehaviour
 
         _spawnDirector.Start(Time.time);
         _gameStartTime = Time.time;
+
+        _metrics.RunStarted(Time.time, _progression.CurrentLevel);
 
         _hud.SetCurrentLevel(_progression.CurrentLevel);
     }
@@ -145,6 +150,8 @@ public class BattleSceneManager : MonoBehaviour
 
     private void OnXpEarned(int xp)
     {
+        GameMetrics.RecordXpEarned(xp);
+
         _progression.AddXp(xp);
         _hud.SetXp(_progression.XpProgress);
 
@@ -156,6 +163,8 @@ public class BattleSceneManager : MonoBehaviour
 
     private void OnQuit()
     {
+        _metrics.RunEnded("quit", Time.time, _score, _progression.CurrentLevel);
+
         Application.Quit();
     }
 
@@ -221,6 +230,8 @@ public class BattleSceneManager : MonoBehaviour
 
         _hud.ShowGameOver();
 
+        _metrics.RunEnded("death", Time.time, _score, _progression.CurrentLevel);
+
         if (_demoConfig != null && _demoConfig.CrashOnGameOver)
         {
             Debug.Log("Saving score to disk.");
@@ -232,6 +243,10 @@ public class BattleSceneManager : MonoBehaviour
     // Gated on DemoConfiguration.CrashOnGameOver. See CONTRIBUTING.md.
     private void SaveScoreToDisk()
     {
+        // Emitted and flushed before the process goes away, so the metric arrives even
+        // though nothing after the native call ever runs.
+        GameMetrics.Count(GameMetrics.RunCrashPathEntered, 1);
+        SentrySdk.Flush(TimeSpan.FromSeconds(2));
 
 #if !UNITY_EDITOR
         Debug.Log("Calling into Native Save Utils.");
@@ -309,10 +324,18 @@ public class BattleSceneManager : MonoBehaviour
         var now = Time.time;
         var level = _progression.CurrentLevel;
 
+        _metrics.Tick(
+            now,
+            Time.unscaledDeltaTime,
+            _enemySpawner.EnemiesAlive,
+            _pickupSpawner.OnScreen
+        );
+
         if (!_isDeathEnemyPresent && (now - _gameStartTime > _tuning.DeathAppearanceTime))
         {
             _isDeathEnemyPresent = true;
             _enemySpawner.SpawnDeath();
+            _metrics.DeathEnemySpawned(now);
 
             // the death enemy resets the clock, so waves double again ahead of the next one
             _gameStartTime = now;
@@ -340,11 +363,13 @@ public class BattleSceneManager : MonoBehaviour
         if (_spawnDirector.ShouldRampUpSpawnRate(now, _tuning.SpawnRampUpInterval))
         {
             _difficulty.RampUpSpawnRates();
+            _metrics.DifficultyRamped(_difficulty.EnemySpawnRate, _difficulty.LinearHeadSpawnRate);
         }
 
         if (_spawnDirector.ShouldRampUpHitPoints(now, _tuning.HpRampUpInterval))
         {
             _difficulty.RampUpHitPoints();
+            _metrics.HitPointsRamped(_difficulty.EnemyHitPointModifier);
 
             GameLog.Trace("Enemy HP modifier is now " + _difficulty.EnemyHitPointModifier);
         }
@@ -364,6 +389,8 @@ public class BattleSceneManager : MonoBehaviour
         if (_progression.TryLevelUp())
         {
             GameLog.Trace("GameManager.Update: Level Up!");
+
+            _metrics.LevelUp(_progression.CurrentLevel, now);
 
             _hud.SetCurrentLevel(_progression.CurrentLevel);
 

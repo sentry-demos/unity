@@ -84,12 +84,18 @@ public class ScorePoster : MonoBehaviour
             if (response.IsSuccessStatusCode)
             {
                 GameLog.Trace("Login to leaderboard successful.");
+                GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "ok"));
                 transaction.Finish(SpanStatus.Ok);
                 _jwtToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
             }
             else
             {
                 GameLog.Trace("Login to leaderboard failed.");
+                GameMetrics.Count(
+                    GameMetrics.ScoreLogin,
+                    1,
+                    (GameMetrics.ResultKey, ((int)response.StatusCode).ToString())
+                );
                 transaction.Finish(SpanStatus.Unavailable);
                 _jwtToken = null;
             }
@@ -97,6 +103,7 @@ public class ScorePoster : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"Login failed: {ex.Message}");
+            GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "error"));
             transaction.Finish(SpanStatus.InternalError);
             _jwtToken = null;
         }
@@ -154,6 +161,7 @@ public class ScorePoster : MonoBehaviour
         if (string.IsNullOrEmpty(_jwtToken))
         {
             GameLog.Trace("Not uploading the score: no leaderboard session.");
+            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, "no_session"));
             _buttonText.text = "Retry";
             return false;
         }
@@ -174,6 +182,10 @@ public class ScorePoster : MonoBehaviour
         var uploadTransaction = SentrySdk.StartTransaction("scoreposter", "upload");
         SentrySdk.ConfigureScope(scope => scope.Transaction = uploadTransaction);
 
+        // Inside the transaction, so a spike in the failure count leads straight to a trace.
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var result = "error";
+
         try
         {
             // Per-request: the client is shared, so mutating its defaults is global state.
@@ -190,12 +202,14 @@ public class ScorePoster : MonoBehaviour
             {
                 GameLog.Trace("Uploading score to leaderboard failed.");
                 SentrySdk.CaptureException(new HttpRequestException("Failed to upload score."));
+                result = ((int)response.StatusCode).ToString();
                 _buttonText.text = "Retry";
                 uploadTransaction.Finish(SpanStatus.Unavailable);
                 return false;
             }
 
             GameLog.Trace("Uploading score to leaderboard was successful.");
+            result = "ok";
             _buttonText.text = "Posted!";
             uploadTransaction.Finish(SpanStatus.Ok);
             return true;
@@ -206,6 +220,16 @@ public class ScorePoster : MonoBehaviour
             _buttonText.text = "Retry";
             uploadTransaction.Finish(SpanStatus.InternalError);
             return false;
+        }
+        finally
+        {
+            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, result));
+            GameMetrics.Distribution(
+                GameMetrics.ScoreUploadDuration,
+                started.Elapsed.TotalMilliseconds,
+                MeasurementUnit.Duration.Millisecond,
+                (GameMetrics.ResultKey, result)
+            );
         }
     }
 }

@@ -1,12 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Sentry;
 using Sentry.Unity;
 using UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Debug = UnityEngine.Debug;
 using Random = UnityEngine.Random;
 
 namespace Upgrades
@@ -65,6 +67,7 @@ namespace Upgrades
             if (paths == null || paths.Count == 0)
             {
                 Debug.LogWarning("No upgrade paths available. Everything fully upgraded?");
+                GameMetrics.Count(GameMetrics.UpgradePoolExhausted, 1);
                 Time.timeScale = 1;
                 gameObject.SetActive(false);
                 return;
@@ -209,6 +212,11 @@ namespace Upgrades
             var fetchTransaction = SentrySdk.StartTransaction("fetch_upgrades", "http.client");
             SentrySdk.ConfigureScope(scope => scope.Transaction = fetchTransaction);
 
+            // Emitted inside the transaction, so every one of these metrics is trace
+            // connected: the count that goes up leads to the trace that explains it.
+            var started = Stopwatch.StartNew();
+            var result = "error";
+
             try
             {
                 var responseContent = FetchUpgradeDataFromServer(fetchTransaction);
@@ -217,9 +225,15 @@ namespace Upgrades
                 if (upgrades == null)
                 {
                     Debug.LogWarning("Upgrade parsing failed, falling back to local upgrades");
+                    result = "parse_failed";
                     fetchTransaction.Finish(SpanStatus.Ok);
                     return null;
                 }
+
+                // Distinct from "ok" on purpose. A parse that succeeds but maps nothing skips
+                // the caller's fallback and costs the player the upgrade, and the only thing
+                // that separates it from a healthy fetch is the count being zero.
+                result = upgrades.Count > 0 ? "ok" : "empty";
 
                 fetchTransaction.Finish(SpanStatus.Ok);
                 return upgrades;
@@ -231,6 +245,16 @@ namespace Upgrades
                 fetchTransaction.Finish(SpanStatus.InternalError);
 
                 return null;
+            }
+            finally
+            {
+                GameMetrics.Count(GameMetrics.UpgradeFetch, 1, (GameMetrics.ResultKey, result));
+                GameMetrics.Distribution(
+                    GameMetrics.UpgradeFetchDuration,
+                    started.Elapsed.TotalMilliseconds,
+                    MeasurementUnit.Duration.Millisecond,
+                    (GameMetrics.ResultKey, result)
+                );
             }
         }
 

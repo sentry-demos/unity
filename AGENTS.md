@@ -24,7 +24,13 @@ The two test assemblies are **empty scaffolding** — asmdefs with no `.cs` file
 `list_tests` reports 0 and CI has no test job. Put new tests there.
 
 Runtime code is grouped by concern: `Characters`, `Config`, `Managers`, `Pickups`,
-`SceneManagers`, `UI`, `Upgrades`, `Weapons`.
+`SceneManagers`, `Telemetry`, `UI`, `Upgrades`, `Weapons`.
+
+`Telemetry` holds the Sentry metrics. `GameMetrics` is the emit layer -- every metric name
+and the attributes they all carry -- and `BattleMetrics` is the per-run lifecycle, driven
+from `BattleSceneManager`. Anything that can fire more than a couple of times a second goes
+through `GameMetrics.Record*`, which accumulates and is drained once a second; `Emit*` is
+for the handful-per-run events. Metrics are always on and are not demo-gated.
 
 Vendored third-party code lives in `Assets/Plugins` and is excluded from formatting.
 

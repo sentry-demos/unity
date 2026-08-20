@@ -94,6 +94,13 @@ public class ProjectileBase : MonoBehaviour
     )
     {
         RaycastHit2D[] hits = Physics2D.CircleCastAll(origin, radius, Vector2.zero);
+
+#if SENTAUR_PERF_METRICS
+        // How much this allocating cast is actually returning. Off by default, for the same
+        // reason as the AutoAim scan timing: it is per projectile hit.
+        GameMetrics.RecordSplashHits(hits.Length);
+#endif
+
         foreach (RaycastHit2D hit in hits)
         {
             if (hit.collider != null && hit.collider.gameObject.CompareTag(Tags.Enemy))

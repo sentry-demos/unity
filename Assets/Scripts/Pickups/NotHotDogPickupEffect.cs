@@ -29,7 +29,23 @@ public class NotHotDogPickupEffect : MonoBehaviour
 
         Debug.Log("Dynamic shader enabled! Loading...");
 
+        var started = System.Diagnostics.Stopwatch.StartNew();
+
         yield return www.SendWebRequest();
+
+        // Reads the result for the metric without acting on it -- the unguarded download
+        // below is the fault this component exists to demonstrate, so it stays unguarded.
+        GameMetrics.Count(
+            GameMetrics.BundleDownload,
+            1,
+            (GameMetrics.ResultKey, www.result.ToString())
+        );
+        GameMetrics.Distribution(
+            GameMetrics.BundleDownloadDuration,
+            started.Elapsed.TotalMilliseconds,
+            Sentry.MeasurementUnit.Duration.Millisecond,
+            (GameMetrics.ResultKey, www.result.ToString())
+        );
 
         Debug.Log("Success! Applying dynamic shader.");
 

@@ -121,7 +121,15 @@ public class Player : SceneSingleton<Player>
         _hitPoints -= (int)(damage * (1 - _damageReductionAmount));
         _hitPoints = Math.Max(_hitPoints, 0); // don't let the player have negative hit points
 
-        _healthBar.SetHealth(1.0f * _hitPoints / _maxHitPoints);
+        var health = 1.0f * _hitPoints / _maxHitPoints;
+        _healthBar.SetHealth(health);
+
+        GameMetrics.RecordDamageTaken(damage);
+        GameMetrics.RecordPlayerHealth(health);
+
+        // timeSinceLevelLoad, not Time.time: the battle scene loads at the start of a run,
+        // so this is time into the run without the player needing to know when it began.
+        GameMetrics.RecordFirstDamage(Time.timeSinceLevelLoad);
 
         if (_hitPoints <= 0)
         {
@@ -141,7 +149,10 @@ public class Player : SceneSingleton<Player>
         _hitPoints += healAmount;
         _hitPoints = Math.Min(_hitPoints, _maxHitPoints);
 
-        _healthBar.SetHealth(1.0f * _hitPoints / _maxHitPoints);
+        var health = 1.0f * _hitPoints / _maxHitPoints;
+        _healthBar.SetHealth(health);
+
+        GameMetrics.RecordPlayerHealth(health);
     }
 
     public void ApplySpeedUp(int speedMultiple, float duration = 0f)
