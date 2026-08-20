@@ -38,8 +38,90 @@ jobs:
             exit 1
           fi
 
+  # Windows heads the build chain: it is the platform we demo from, so it gets the
+  # license seat first and its artifact is ready while the others are still building.
+  build-windows:
+    name: Build Windows
+    runs-on: windows-2022
+    env:
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Fingerprint Windows build
+        id: fingerprint
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneWindows64
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Restore cached Windows player
+        id: cached
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+
+      - name: Cache Unity Library
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneWindows64
+
+      - name: Set up Unity
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: windows-il2cpp
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
+
+      - name: Build Windows player
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneWindows64
+          output-path: Build/StandaloneWindows64/SentaurSurvivors.exe
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneWindows64
+          path: Build/StandaloneWindows64
+          retention-days: 90
+
+      - name: Cache Windows player
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+          save: true
+
+      - name: Save Unity Library
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneWindows64
+          save: true
+
   build-macos:
     name: Build macOS and iOS
+    needs: build-windows
+    # Not always(): that would keep the chain going after the run is cancelled.
+    # !cancelled() still runs this when the previous build failed.
+    if: ${{ !cancelled() }}
     runs-on: macos-15
     env:
       UNITY_NO_CONSENT_PROMPT: 1
@@ -193,89 +275,9 @@ jobs:
           target: StandaloneOSX
           save: true
 
-  build-windows:
-    name: Build Windows
-    needs: build-macos
-    # Not always(): that would keep the chain going after the run is cancelled.
-    # !cancelled() still runs this when the previous build failed.
-    if: ${{ !cancelled() }}
-    runs-on: windows-2022
-    env:
-      UNITY_NO_CONSENT_PROMPT: 1
-      UNITY_NO_UPDATE_CHECK: 1
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-
-      - name: Fingerprint Windows build
-        id: fingerprint
-        uses: ./.github/actions/build-fingerprint
-        with:
-          target: StandaloneWindows64
-          sentry-dsn: ${{ secrets.DSN }}
-          sentry-org: ${{ secrets.ORG }}
-          sentry-project: ${{ secrets.PROJECT }}
-
-      - name: Restore cached Windows player
-        id: cached
-        uses: ./.github/actions/cache-player
-        with:
-          key: ${{ steps.fingerprint.outputs.key }}
-          path: Build/StandaloneWindows64
-
-      - name: Cache Unity Library
-        if: steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/cache-unity-library
-        with:
-          target: StandaloneWindows64
-
-      - name: Set up Unity
-        if: steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/setup-unity
-        with:
-          modules: windows-il2cpp
-          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
-
-      - name: Build Windows player
-        if: steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/build-player
-        with:
-          target: StandaloneWindows64
-          output-path: Build/StandaloneWindows64/SentaurSurvivors.exe
-          sentry-dsn: ${{ secrets.DSN }}
-          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
-          sentry-org: ${{ secrets.ORG }}
-          sentry-project: ${{ secrets.PROJECT }}
-
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SentaurSurvivors-StandaloneWindows64
-          path: Build/StandaloneWindows64
-          retention-days: 90
-
-      - name: Cache Windows player
-        if: steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/cache-player
-        with:
-          key: ${{ steps.fingerprint.outputs.key }}
-          path: Build/StandaloneWindows64
-          save: true
-
-      - name: Save Unity Library
-        if: steps.cached.outputs.hit != 'true'
-        uses: ./.github/actions/cache-unity-library
-        with:
-          target: StandaloneWindows64
-          save: true
-
   build-linux:
     name: Build Linux and Android
-    needs: build-windows
+    needs: build-macos
     if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     env:
@@ -410,7 +412,11 @@ jobs:
 
   run-demo:
     name: Run Demo
-    needs: [build-windows, build-linux, build-macos]
+    # Only the Windows demo is enabled in run-demo.yml, and the Windows artifact is
+    # ready as soon as the first build finishes - so the demo runs alongside the
+    # macOS and Linux builds instead of behind them. Re-enabling a demo job for
+    # another platform means adding that platform's build back to this list.
+    needs: build-windows
     uses: ./.github/workflows/run-demo.yml
     secrets: inherit
     with:
