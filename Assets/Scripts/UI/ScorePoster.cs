@@ -83,14 +83,14 @@ public class ScorePoster : MonoBehaviour
             var response = await _httpClient.PostAsync(_demoConfig.ApiUrl + "/token", content);
             if (response.IsSuccessStatusCode)
             {
-                GameLog.Trace("Login to leaderboard successful.");
+                Debug.Log("Login to leaderboard successful.");
                 GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "ok"));
                 transaction.Finish(SpanStatus.Ok);
                 _jwtToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
             }
             else
             {
-                GameLog.Trace("Login to leaderboard failed.");
+                Debug.Log("Login to leaderboard failed.");
                 GameMetrics.Count(
                     GameMetrics.ScoreLogin,
                     1,
@@ -160,7 +160,7 @@ public class ScorePoster : MonoBehaviour
 
         if (string.IsNullOrEmpty(_jwtToken))
         {
-            GameLog.Trace("Not uploading the score: no leaderboard session.");
+            Debug.Log("Not uploading the score: no leaderboard session.");
             GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, "no_session"));
             _buttonText.text = "Retry";
             return false;
@@ -200,7 +200,7 @@ public class ScorePoster : MonoBehaviour
 
             if (!response.IsSuccessStatusCode)
             {
-                GameLog.Trace("Uploading score to leaderboard failed.");
+                Debug.Log("Uploading score to leaderboard failed.");
                 SentrySdk.CaptureException(new HttpRequestException("Failed to upload score."));
                 result = ((int)response.StatusCode).ToString();
                 _buttonText.text = "Retry";
@@ -208,7 +208,7 @@ public class ScorePoster : MonoBehaviour
                 return false;
             }
 
-            GameLog.Trace("Uploading score to leaderboard was successful.");
+            Debug.Log("Uploading score to leaderboard was successful.");
             result = "ok";
             _buttonText.text = "Posted!";
             uploadTransaction.Finish(SpanStatus.Ok);

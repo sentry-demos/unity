@@ -16,7 +16,7 @@ public class HealthBar : MonoBehaviour
     // 0.0f = 0% health, 1.0f = 100% health
     public void SetHealth(float health)
     {
-        GameLog.Trace("HealthBar.SetHealth: Setting health to " + health);
+        Debug.Log("HealthBar.SetHealth: Setting health to " + health);
         _slider.value = health;
     }
 }

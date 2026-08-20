@@ -80,19 +80,21 @@ namespace SceneManagers
 
         public void StartGame()
         {
-            GameLog.Trace("Start Game");
+            // CI's demo run proves the build reached gameplay from this line.
+            // Mirrored in .github/scripts/lib/DemoRun.psm1.
+            Debug.Log("Start Game");
             SceneManager.LoadScene("BattleScene", LoadSceneMode.Single);
         }
 
         public void QuitGame()
         {
-            GameLog.Trace("Quit (Note this won't quit in the editor)");
+            Debug.Log("Quit (Note this won't quit in the editor)");
             Application.Quit();
         }
 
         private void UnityOfBugs()
         {
-            GameLog.Trace("Loading UnityOfBugs");
+            Debug.Log("Loading UnityOfBugs");
             SceneManager.LoadScene("1_Bugfarm", LoadSceneMode.Single);
         }
     }

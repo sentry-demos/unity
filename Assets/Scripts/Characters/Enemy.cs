@@ -192,7 +192,7 @@ public class Enemy : MonoBehaviour
     // Deal damage to the player because they touched
     private void DamagePlayer(Player player)
     {
-        GameLog.Trace("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
+        Debug.Log("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
 
         player.ApplyDamage(_collisionDamage);
     }

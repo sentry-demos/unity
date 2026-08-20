@@ -94,25 +94,25 @@ namespace Upgrades
         private IEnumerator SelectSomething()
         {
             var delay = Random.value;
-            GameLog.Trace($"Starting to select in {delay} seconds");
+            Debug.Log($"Starting to select in {delay} seconds");
             yield return new WaitForSecondsRealtime(delay);
 
-            GameLog.Trace("Done waiting");
+            Debug.Log("Done waiting");
 
             if (Random.value > 0.5f)
             {
-                GameLog.Trace("Selected left");
+                Debug.Log("Selected left");
                 SetHighlightedButton(_option1Button);
             }
             else
             {
-                GameLog.Trace("Selected right");
+                Debug.Log("Selected right");
                 SetHighlightedButton(_option2Button);
             }
 
             yield return new WaitForSecondsRealtime(Random.value);
 
-            GameLog.Trace("Clicking the highlighted button");
+            Debug.Log("Clicking the highlighted button");
             _highlightedButton?.GetComponent<Button>().onClick.Invoke();
         }
 

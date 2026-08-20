@@ -251,6 +251,8 @@ public class BattleSceneManager : MonoBehaviour
 #if !UNITY_EDITOR
         Debug.Log("Calling into Native Save Utils.");
 
+        // The log lines below are mirrored in .github/scripts/lib/DemoRun.psm1: they are how
+        // the demo run tells a real crash from one the process survived.
         try
         {
             Debug.Log("Attempting save_score_to_disk...");
@@ -371,7 +373,7 @@ public class BattleSceneManager : MonoBehaviour
             _difficulty.RampUpHitPoints();
             _metrics.HitPointsRamped(_difficulty.EnemyHitPointModifier);
 
-            GameLog.Trace("Enemy HP modifier is now " + _difficulty.EnemyHitPointModifier);
+            Debug.Log("Enemy HP modifier is now " + _difficulty.EnemyHitPointModifier);
         }
 
         if (
@@ -388,7 +390,7 @@ public class BattleSceneManager : MonoBehaviour
 
         if (_progression.TryLevelUp())
         {
-            GameLog.Trace("GameManager.Update: Level Up!");
+            Debug.Log("GameManager.Update: Level Up!");
 
             _metrics.LevelUp(_progression.CurrentLevel, now);
 
