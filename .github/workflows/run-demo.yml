@@ -66,7 +66,7 @@ jobs:
         timeout-minutes: 10
         shell: pwsh
         env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: |
           $executable = './build/SentaurSurvivors.exe'
           if (-not (Test-Path $executable)) {
@@ -86,6 +86,8 @@ jobs:
   run-linux:
     name: Run Linux Build
     needs: get-build-run
+    # Temporarily disabled: only the Windows demo runs for now.
+    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -103,7 +105,7 @@ jobs:
         timeout-minutes: 10
         shell: bash
         env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: |
           executable=./build/SentaurSurvivors
           if [ ! -f "$executable" ]; then
@@ -126,6 +128,8 @@ jobs:
   run-macos:
     name: Run macOS Build
     needs: get-build-run
+    # Temporarily disabled: only the Windows demo runs for now.
+    if: false
     runs-on: macos-15
 
     steps:
@@ -150,7 +154,7 @@ jobs:
         timeout-minutes: 10
         shell: bash
         env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: |
           executable=./build/SentaurSurvivors.app/Contents/MacOS/SentaurSurvivors
           if [ ! -f "$executable" ]; then
@@ -171,6 +175,8 @@ jobs:
   run-ios:
     name: Run iOS Build
     needs: get-build-run
+    # Temporarily disabled: only the Windows demo runs for now.
+    if: false
     runs-on: macos-15
 
     steps:
@@ -195,7 +201,7 @@ jobs:
         timeout-minutes: 15
         shell: pwsh
         env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: ./.github/scripts/run-demo-ios.ps1 -AppPath ./build/SentaurSurvivors.app -Dsn $env:SENTRY_DSN
 
       - name: Upload iOS player log
@@ -209,6 +215,8 @@ jobs:
   run-android:
     name: Run Android Build
     needs: get-build-run
+    # Temporarily disabled: only the Windows demo runs for now.
+    if: false
     runs-on: ubuntu-24.04-arm
     env:
       ANDROID_SERIAL: localhost:5555
@@ -256,7 +264,7 @@ jobs:
         timeout-minutes: 15
         shell: pwsh
         env:
-          SENTRY_DSN: ${{ secrets.TEST_DSN }}
+          SENTRY_DSN: ${{ secrets.DSN }}
         run: ./.github/scripts/run-demo-android.ps1 -ApkPath ./build/SentaurSurvivors.apk -Dsn $env:SENTRY_DSN
 
       - name: Upload Android player log

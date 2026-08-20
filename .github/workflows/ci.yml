@@ -57,18 +57,18 @@ jobs:
         uses: ./.github/actions/build-fingerprint
         with:
           target: StandaloneOSX
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Fingerprint iOS build
         id: fingerprint-ios
         uses: ./.github/actions/build-fingerprint
         with:
           target: iOS
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       # The archives are cached rather than the build directories: they are what the
       # artifacts are made of, and taring first avoids the symlink and permission
@@ -121,10 +121,10 @@ jobs:
         with:
           target: StandaloneOSX
           output-path: Build/StandaloneOSX/SentaurSurvivors.app
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       # Tar the bundle: upload-artifact drops the executable bit and flattens the
       # symlinks that the .app relies on to launch.
@@ -139,10 +139,10 @@ jobs:
         with:
           target: iOS
           output-path: Build/iOS
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Compile iOS Xcode project
         if: steps.cached-ios.outputs.hit != 'true'
@@ -216,9 +216,9 @@ jobs:
         uses: ./.github/actions/build-fingerprint
         with:
           target: StandaloneWindows64
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Restore cached Windows player
         id: cached
@@ -246,10 +246,10 @@ jobs:
         with:
           target: StandaloneWindows64
           output-path: Build/StandaloneWindows64/SentaurSurvivors.exe
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -294,18 +294,18 @@ jobs:
         uses: ./.github/actions/build-fingerprint
         with:
           target: StandaloneLinux64
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Fingerprint Android build
         id: fingerprint-android
         uses: ./.github/actions/build-fingerprint
         with:
           target: Android
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Restore cached Linux player
         id: cached-linux
@@ -355,10 +355,10 @@ jobs:
         with:
           target: StandaloneLinux64
           output-path: Build/StandaloneLinux64/SentaurSurvivors
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Build Android player
         if: steps.cached-android.outputs.hit != 'true'
@@ -366,10 +366,10 @@ jobs:
         with:
           target: Android
           output-path: Build/Android/SentaurSurvivors.apk
-          sentry-dsn: ${{ secrets.TEST_DSN }}
-          sentry-auth-token: ${{ secrets.TEST_AUTH_TOKEN }}
-          sentry-org: ${{ secrets.TEST_ORG }}
-          sentry-project: ${{ secrets.TEST_PROJECT }}
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Upload Linux Build Artifact
         uses: actions/upload-artifact@v4
