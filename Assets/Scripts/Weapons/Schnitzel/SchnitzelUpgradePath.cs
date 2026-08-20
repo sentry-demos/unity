@@ -1,6 +1,6 @@
 using UnityEngine;
 
-class SchnitzelUpgradePath : WeaponUpgradePath
+internal class SchnitzelUpgradePath : WeaponUpgradePath
 {
     [SerializeField]
     private string[] _description = new string[]
@@ -20,7 +20,7 @@ class SchnitzelUpgradePath : WeaponUpgradePath
     public override void UpgradeToLevel(int level)
     {
         var schnitzel = (Schnitzel)_weapon;
-        switch (_level)
+        switch (level)
         {
             case 1:
                 Activate();

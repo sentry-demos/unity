@@ -7,9 +7,19 @@ namespace Characters
     public class DemoPlayerController : MonoBehaviour
     {
         private DemoConfiguration _demoConfig;
+
+        [SerializeField]
+        [Tooltip("Parent transform holding the spawned enemies")]
         private Transform _enemiesTransform;
+
+        [SerializeField]
+        [Tooltip("Parent transform holding the spawned pickups")]
         private Transform _pickupsTransform;
+
+        [SerializeField]
+        [Tooltip("Parent transform holding the XP drops")]
         private Transform _xpDropsTransform;
+
         private Dart _dart;
         private Gamepad _virtualGamepad;
 
@@ -34,19 +44,6 @@ namespace Characters
 
         private void Start()
         {
-            // Find the Level GameObject and get references to child transforms
-            GameObject levelObject = GameObject.Find("Level");
-            if (levelObject != null)
-            {
-                _enemiesTransform = levelObject.transform.Find("Enemies");
-                _pickupsTransform = levelObject.transform.Find("Pickups");
-                _xpDropsTransform = levelObject.transform.Find("XpDrops");
-            }
-            else
-            {
-                Debug.LogWarning("Level GameObject not found!");
-            }
-
             // Get the Dart component from child transforms
             _dart = GetComponentInChildren<Dart>();
             if (_dart == null)
@@ -60,7 +57,7 @@ namespace Characters
             if (_demoConfig != null && _demoConfig.AutoPlay)
             {
                 HandleMovement();
-                HandleShooting();    
+                HandleShooting();
             }
         }
 
@@ -93,7 +90,9 @@ namespace Characters
         private Transform GetClosestXpDrop()
         {
             if (_xpDropsTransform == null || _xpDropsTransform.childCount == 0)
+            {
                 return null;
+            }
 
             Transform closest = null;
             float closestDistance = float.MaxValue;
@@ -102,7 +101,7 @@ namespace Characters
             {
                 Transform child = _xpDropsTransform.GetChild(i);
                 float distance = Vector3.Distance(transform.position, child.position);
-                
+
                 if (distance < closestDistance)
                 {
                     closestDistance = distance;
@@ -116,7 +115,9 @@ namespace Characters
         private Transform GetClosestPickup()
         {
             if (_pickupsTransform == null || _pickupsTransform.childCount == 0)
+            {
                 return null;
+            }
 
             Transform closest = null;
             float closestDistance = float.MaxValue;
@@ -125,7 +126,7 @@ namespace Characters
             {
                 Transform child = _pickupsTransform.GetChild(i);
                 float distance = Vector3.Distance(transform.position, child.position);
-                
+
                 if (distance < closestDistance)
                 {
                     closestDistance = distance;
@@ -139,7 +140,9 @@ namespace Characters
         private Transform GetClosestEnemy()
         {
             if (_enemiesTransform == null || _enemiesTransform.childCount == 0)
+            {
                 return null;
+            }
 
             Transform closest = null;
             float closestDistance = float.MaxValue;
@@ -148,7 +151,7 @@ namespace Characters
             {
                 Transform child = _enemiesTransform.GetChild(i);
                 float distance = Vector3.Distance(transform.position, child.position);
-                
+
                 if (distance < closestDistance)
                 {
                     closestDistance = distance;
@@ -166,7 +169,7 @@ namespace Characters
             {
                 direction = (target.position - transform.position).normalized;
             }
-         
+
             if (_virtualGamepad != null)
             {
                 InputSystem.QueueStateEvent(_virtualGamepad, new GamepadState { leftStick = direction });

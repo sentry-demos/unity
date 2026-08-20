@@ -10,13 +10,10 @@ public class DamageText : MonoBehaviour
 
     private Sequence _animSequence;
 
-    void Awake()
+    private void Awake()
     {
         _text = transform.Find("Text").GetComponent<TextMeshPro>();
     }
-
-    // Update is called once per frame
-    void Update() { }
 
     public void SetDamage(int damage)
     {
@@ -26,7 +23,7 @@ public class DamageText : MonoBehaviour
     private void Init(int value)
     {
         // set the text
-        this.SetDamage(value);
+        SetDamage(value);
 
         // make the text jump up
         _animSequence = transform.DOLocalJump(

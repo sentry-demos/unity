@@ -31,7 +31,7 @@ public class Starfish : WeaponBase
         {
             var starfish = Instantiate(_starfishProjectilePrefab);
             starfish.Initialize(Damage, Duration, degreesBetweenStarfish * i);
-            starfish.transform.parent = this.transform;
+            starfish.transform.parent = transform;
         }
 
         // reset cooldown after duration

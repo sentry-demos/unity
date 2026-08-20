@@ -3,12 +3,11 @@ using UnityEngine;
 
 public class WeaponManager : MonoBehaviour
 {
-    [SerializeField] public float GlobalDamageModifier = 1.0f;
-    [SerializeField] public float GlobalCooldownModifier = 1.0f;
-
-    public float GlobalEffektCooldownModifier = 1.0f;
-    
-    [SerializeField] public int GlobalCountModifier = 1;
+    /// <summary>
+    /// The player's global weapon modifiers. Runtime state, deliberately not serialised: it
+    /// accumulates over a run and must start fresh each time.
+    /// </summary>
+    public WeaponStats Stats { get; } = new WeaponStats();
 
     private List<WeaponBase> _weapons = new List<WeaponBase>();
 
@@ -32,38 +31,6 @@ public class WeaponManager : MonoBehaviour
             {
                 weapon.Fire();
             }
-        }
-    }
-
-    public void UpgradeDamage(int level)
-    {
-        if (level == 1)
-        {
-            GlobalDamageModifier = 1.3f;
-        }
-        else if (level == 2)
-        {
-            GlobalDamageModifier = 1.6f;
-        }
-        else if (level == 3)
-        {
-            GlobalDamageModifier = 2.0f;
-        }
-    }
-
-    public void UpgradeCooldown(int level)
-    {
-        if (level == 1)
-        {
-            GlobalCooldownModifier = 0.8f;
-        }
-        else if (level == 2)
-        {
-            GlobalCooldownModifier = 0.6f;
-        }
-        else if (level == 3)
-        {
-            GlobalCooldownModifier = 0.3f;
         }
     }
 }

@@ -1,13 +1,8 @@
-using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class Schnitzel : WeaponBase
 {
-    private InputAction _lookAction;
-    private InputAction _mouseAction;
-    
     [SerializeField]
     private float _speed = 5.0f;
 
@@ -24,11 +19,11 @@ public class Schnitzel : WeaponBase
     private SchnitzelProjectile _schnitzelProjectilePrefab;
 
     private Vector3 _shootingDirection = Vector3.right;
-    
-    private void Awake()
+    private AutoAim _autoAim;
+
+    private void Start()
     {
-        _lookAction = InputSystem.actions.FindAction("Look");
-        _mouseAction = InputSystem.actions.FindAction("Mouse");
+        _autoAim = Player.Instance.GetComponent<AutoAim>();
     }
 
     public override void Fire()
@@ -42,7 +37,7 @@ public class Schnitzel : WeaponBase
     public IEnumerator ShootSchnitzels(GameObject player)
     {
         SchnitzelProjectile schnitzelProjectilePrefab = _schnitzelProjectilePrefab;
-        _shootingDirection = CalculateDirection(player);
+        _shootingDirection = CalculateDirection();
 
         // shoot the base number of schnitzel
         for (int i = 0; i < Count; i++)
@@ -50,8 +45,8 @@ public class Schnitzel : WeaponBase
             ShootOneSchnitzel(schnitzelProjectilePrefab, player, _shootingDirection);
 
             yield return new WaitForSeconds(_shootingInterval);
-            // get new updates mouse coords inbetween shots
-            _shootingDirection = CalculateDirection(player);
+            // re-aim between shots, so a burst tracks a target that is still moving
+            _shootingDirection = CalculateDirection();
         }
 
         // reset cooldown after all schnitzels fired
@@ -60,26 +55,10 @@ public class Schnitzel : WeaponBase
         yield return null;
     }
 
-    private Vector3 CalculateDirection(GameObject player)
+    /// <summary>Where to fire, holding the last direction until the auto-aim is available.</summary>
+    private Vector3 CalculateDirection()
     {
-        // Use gamepad right stick if it's actively being used
-        var stickDirection = _lookAction.ReadValue<Vector2>();
-        if (stickDirection.magnitude >= 0.1f)
-        {
-            return stickDirection;
-        }
-
-        // On desktop, fall through to mouse aiming
-        if (Application.platform != RuntimePlatform.Android &&
-            Application.platform != RuntimePlatform.IPhonePlayer)
-        {
-            var mousePosition = Camera.main.ScreenToWorldPoint(_mouseAction.ReadValue<Vector2>());
-            var targetDirection = mousePosition - player.transform.position;
-            return targetDirection;
-        }
-
-        // On mobile with no stick input, keep current direction
-        return _shootingDirection;
+        return _autoAim != null ? _autoAim.AimDirection : _shootingDirection;
     }
 
     private void ShootOneSchnitzel(SchnitzelProjectile prefab, GameObject player, Vector3 direction)

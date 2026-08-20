@@ -10,7 +10,7 @@ namespace UI
         [SerializeField] private float _movementRange = 50;
         [SerializeField] private RectTransform _stickTransform;
         [SerializeField] private RectTransform _ringTransform;
-        
+
         [InputControl(layout = "Vector2")]
         [SerializeField] private string _controlPath;
         protected override string controlPathInternal
@@ -20,24 +20,24 @@ namespace UI
         }
 
         private RectTransform _rectTransform;
-        
+
         private Vector2 _startPos;
         private Vector2 _pointerDownPos;
         private Vector2 _dragPos;
-        
+
         private void Start()
         {
             _rectTransform = (RectTransform)transform;
             _startPos = _stickTransform.anchoredPosition;
         }
-        
+
         public void OnPointerDown(PointerEventData eventData)
         {
             if (eventData == null)
             {
                 return;
             }
-            
+
             RectTransformUtility.ScreenPointToLocalPointInRectangle(_rectTransform, eventData.position, eventData.pressEventCamera, out _pointerDownPos);
             _stickTransform.anchoredPosition = new Vector2(_pointerDownPos.x, _rectTransform.rect.height + _pointerDownPos.y);
             _ringTransform.anchoredPosition = new Vector2(_pointerDownPos.x, _rectTransform.rect.height + _pointerDownPos.y);

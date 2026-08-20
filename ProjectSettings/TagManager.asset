@@ -2,13 +2,14 @@
 %TAG !u! tag:unity3d.com,2011:
 --- !u!78 &1
 TagManager:
-  serializedVersion: 2
+  serializedVersion: 3
   tags:
   - Enemy
   - Barrier
   - Characters
   - Projectiles
   - XpDrop
+  - PlayerHitbox
   layers:
   - Default
   - TransparentFX
@@ -73,3 +74,5 @@ TagManager:
   - name: WorldSpace UI
     uniqueID: 3738593703
     locked: 0
+  m_RenderingLayers:
+  - Default

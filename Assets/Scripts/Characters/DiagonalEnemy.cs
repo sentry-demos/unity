@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class DiagonalEnemy : Enemy
 {
-    Vector2 _direction;
+    private Vector2 _direction;
 
     protected override void Awake()
     {
@@ -24,14 +24,14 @@ public class DiagonalEnemy : Enemy
     {
         base.OnCollisionEnter2D(collision);
 
-        if (collision.gameObject.tag == "Barrier")
+        if (collision.gameObject.CompareTag(Tags.Barrier))
         {
             // reflect the velocity of the enemy off the barrier
             // https://stackoverflow.com/questions/49790711/reflect-a-projectile-on-collision-in-unity
 
             _direction = Vector3.Reflect(_direction, collision.contacts[0].normal);
         }
-        else if (collision.gameObject.tag == "Enemy")
+        else if (collision.gameObject.CompareTag(Tags.Enemy))
         {
             // ignore physics collision with other enemies
             Physics2D.IgnoreCollision(collision.collider, GetComponent<Collider2D>());

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-class ProjectileCountUpgradePath : UpgradePathBase
+internal class ProjectileCountUpgradePath : UpgradePathBase
 {
     [SerializeField]
     private string[] _descriptions =
@@ -11,24 +11,19 @@ class ProjectileCountUpgradePath : UpgradePathBase
     };
     protected override string[] Descriptions => _descriptions;
 
+    // Additive, matching the descriptions. These used to be absolute assignments
+    // (2, 3, 5) that only produced the advertised "+1, +1, +2" because the modifier
+    // happens to start at 1 -- and the level-3 text said "+2" while assigning 5.
     [SerializeField]
-    private int[] _countModifiersPerLevel = { 2, 3, 5 };
+    private int[] _projectilesAddedPerLevel = { 1, 1, 2 };
 
     public override void UpgradeToLevel(int level)
     {
-        // get WeaponManager
-        var weaponManager = FindAnyObjectByType<WeaponManager>();
-        switch (level)
+        if (level < 1 || level > _projectilesAddedPerLevel.Length)
         {
-            case 1:
-                weaponManager.GlobalCountModifier = _countModifiersPerLevel[0];
-                break;
-            case 2:
-                weaponManager.GlobalCountModifier = _countModifiersPerLevel[1];
-                break;
-            case 3:
-                weaponManager.GlobalCountModifier = _countModifiersPerLevel[2];
-                break;
+            return;
         }
+
+        Player.Instance.WeaponManager.Stats.AddProjectiles(_projectilesAddedPerLevel[level - 1]);
     }
 }

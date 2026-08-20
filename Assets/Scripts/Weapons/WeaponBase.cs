@@ -11,12 +11,16 @@ public abstract class WeaponBase : MonoBehaviour
     [SerializeField]
     public float BaseDamage;
 
-    public float Cooldown => BaseCooldown * Player.Instance.WeaponManager.GlobalCooldownModifier * Player.Instance.WeaponManager.GlobalEffektCooldownModifier;
-    public int Damage => (int)(Player.Instance.WeaponManager.GlobalDamageModifier * BaseDamage);
-    public int Count => Player.Instance.WeaponManager.GlobalCountModifier;
+    private static WeaponStats Stats => Player.Instance.WeaponManager.Stats;
+
+    public float Cooldown => BaseCooldown * Stats.TotalCooldownModifier;
+    public int Damage => (int)(Stats.DamageModifier * BaseDamage);
+    public int Count => Stats.ProjectileCount;
 
     protected float _timeElapsedSinceLastFire = 0.0f;
 
+    // Scaled time on purpose: cooldowns must freeze while paused. UI that runs during a
+    // pause (the level-up popup) uses WaitForSecondsRealtime instead.
     protected virtual void Update()
     {
         if (_isEnabled)

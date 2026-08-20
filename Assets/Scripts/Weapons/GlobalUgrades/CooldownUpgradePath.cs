@@ -1,6 +1,6 @@
 using UnityEngine;
 
-class CooldownUpgradePath : UpgradePathBase
+internal class CooldownUpgradePath : UpgradePathBase
 {
     [SerializeField]
     private string[] _descriptions =
@@ -17,18 +17,13 @@ class CooldownUpgradePath : UpgradePathBase
 
     public override void UpgradeToLevel(int level)
     {
-        var weaponManager = FindAnyObjectByType<WeaponManager>();
-        switch (level)
+        if (level < 1 || level > _cooldownModifiersPerLevel.Length)
         {
-            case 1:
-                weaponManager.GlobalCooldownModifier *= _cooldownModifiersPerLevel[0];
-                break;
-            case 2:
-                weaponManager.GlobalCooldownModifier *= _cooldownModifiersPerLevel[1];
-                break;
-            case 3:
-                weaponManager.GlobalCooldownModifier *= _cooldownModifiersPerLevel[2];
-                break;
+            return;
         }
+
+        Player.Instance.WeaponManager.Stats.ApplyCooldownMultiplier(
+            _cooldownModifiersPerLevel[level - 1]
+        );
     }
 }

@@ -3,22 +3,22 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
-class ActivePickupsUI : MonoBehaviour
+internal class ActivePickupsUI : MonoBehaviour
 {
-    struct ActivePickupState
+    private struct ActivePickupState
     {
         public GameObject GameObject;
         public float ExpirationTime;
 
         public ActivePickupState(GameObject gameObject, float expirationTime)
         {
-            this.GameObject = gameObject;
-            this.ExpirationTime = expirationTime;
+            GameObject = gameObject;
+            ExpirationTime = expirationTime;
         }
 
         public ActivePickupState Extend(float duration)
         {
-            return new ActivePickupState(this.GameObject, this.ExpirationTime + duration);
+            return new ActivePickupState(GameObject, ExpirationTime + duration);
         }
     }
 
@@ -53,8 +53,9 @@ class ActivePickupsUI : MonoBehaviour
 
     private void Update()
     {
-        var expiredPickupStateIds = (from kvp in _activePickups where Time.time > kvp.Value.ExpirationTime 
-            select kvp.Key).ToList();
+        var expiredPickupStateIds = (from kvp in _activePickups
+                                     where Time.time > kvp.Value.ExpirationTime
+                                     select kvp.Key).ToList();
 
         foreach (var expiredPickupId in expiredPickupStateIds)
         {

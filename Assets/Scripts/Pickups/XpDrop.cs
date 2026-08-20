@@ -24,7 +24,7 @@ public class XpDrop : MonoBehaviour
         _xp = xp;
     }
 
-    void Update()
+    private void Update()
     {
         var player = Player.Instance;
         if (player == null)
@@ -53,13 +53,13 @@ public class XpDrop : MonoBehaviour
     }
 
     // on trigger handler
-    void OnTriggerEnter2D(Collider2D other)
+    private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.gameObject.name == "PlayerHitbox")
+        // Only the player's magnet hitbox collects XP, not the body collider -- the body is
+        // non-trigger, but OnTriggerEnter2D still fires for it because this drop is a trigger.
+        if (other.gameObject.CompareTag(Tags.PlayerHitbox))
         {
-            // var player = other.transform.parent.gameObject.GetComponent<Player>();
-
-            EventManager.TriggerEvent("XpEarned", new EventData(_xp));
+            GameEvents.RaiseXpEarned(_xp);
 
             Destroy(gameObject);
         }

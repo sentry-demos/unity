@@ -28,7 +28,7 @@ public class DartProjectile : ProjectileBase
     }
 
     // Deal damage to the enemy because they were hit by a dart
-    override protected void DamageEnemy(Enemy initialEnemy)
+    protected override void DamageEnemy(Enemy initialEnemy)
     {
         // why 5000? -- the result of experimenting with different values (!)
         initialEnemy.Knockback(_direction, 5000);

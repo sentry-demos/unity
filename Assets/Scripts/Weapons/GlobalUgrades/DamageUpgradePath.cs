@@ -11,18 +11,13 @@ public class DamageUpgradePath : UpgradePathBase
 
     public override void UpgradeToLevel(int level)
     {
-        var weaponManager = Player.Instance.WeaponManager;
-        switch (_level)
+        if (level < 1 || level > _damageModifiersPerLevel.Length)
         {
-            case 1:
-                weaponManager.GlobalDamageModifier *= _damageModifiersPerLevel[0];
-                break;
-            case 2:
-                weaponManager.GlobalDamageModifier *= _damageModifiersPerLevel[1];
-                break;
-            case 3:
-                weaponManager.GlobalDamageModifier *= _damageModifiersPerLevel[2];
-                break;
+            return;
         }
+
+        Player.Instance.WeaponManager.Stats.ApplyDamageMultiplier(
+            _damageModifiersPerLevel[level - 1]
+        );
     }
 }

@@ -3,10 +3,10 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class Player : MonoBehaviour
+public class Player : SceneSingleton<Player>
 {
     private InputAction _moveAction;
-    
+
     [SerializeField]
     public WeaponManager WeaponManager;
 
@@ -36,8 +36,6 @@ public class Player : MonoBehaviour
     [Tooltip("How much damage is reduced for the player")]
     private float _damageReductionAmount = 0.0f;
 
-    [SerializeField] private Transform arrow;
-    
     public enum PlayerEffectTypes
     {
         SpeedUp,
@@ -46,7 +44,7 @@ public class Player : MonoBehaviour
 
     private HealthBar _healthBar;
     public Animator animator;
-    bool facingRight = false;
+    private bool facingRight = false;
 
     public AudioSource takeDamageSound;
     public Vector3 lastPosition;
@@ -55,60 +53,51 @@ public class Player : MonoBehaviour
     private IEnumerator coroutine;
     private bool _isDead = false;
 
-    static Player _instance;
+    private static readonly int Horizontal = Animator.StringToHash("Horizontal");
+    private static readonly int Speed = Animator.StringToHash("Speed");
+    private static readonly int FacingRight = Animator.StringToHash("FacingRight");
+    private static readonly int Dead = Animator.StringToHash("Dead");
 
     private float _restoreSpeedTime = 0.0f;
     private float _restoreDamageResistTime = 0.0f;
 
-    public static Player Instance
+    protected override void Awake()
     {
-        get
-        {
-            if (_instance == null)
-            {
-                _instance = FindAnyObjectByType<Player>();
-            }
-            return _instance;
-        }
-    }
+        base.Awake();
 
-    void Awake()
-    {
         _moveAction = InputSystem.actions.FindAction("Move");
         _rigidBody = GetComponent<Rigidbody2D>();
     }
 
-    void Start()
+    private void Start()
     {
         _baseMoveRate = _playerMoveRate;
-
-        // get a reference to the Healthbar component
-        _healthBar = GameObject.Find("HealthBar").GetComponent<HealthBar>();
+        _healthBar = GetComponentInChildren<HealthBar>(includeInactive: true);
 
         takeDamageSound = GetComponent<AudioSource>();
     }
 
     private void Update()
     {
-        animator.SetFloat("Horizontal", _rigidBody.linearVelocity.x);
-        animator.SetFloat("Speed", _rigidBody.linearVelocity.sqrMagnitude);
-        animator.SetBool("FacingRight", facingRight);
-        
+        animator.SetFloat(Horizontal, _rigidBody.linearVelocity.x);
+        animator.SetFloat(Speed, _rigidBody.linearVelocity.sqrMagnitude);
+        animator.SetBool(FacingRight, facingRight);
+
         HandleMovement();
     }
-    
+
     private void HandleMovement()
     {
         if (_isDead)
         {
             return;
         }
-        
+
         lastPosition = transform.position;
-        
+
         var movement = _moveAction.ReadValue<Vector2>();
         _rigidBody.linearVelocity = movement.normalized * _playerMoveRate;
-        
+
         if (movement.x > 0)
         {
             facingRight = true;
@@ -119,12 +108,12 @@ public class Player : MonoBehaviour
         } // if 0, don't modify
     }
 
-    IEnumerator Wait(float _waitTime)
+    private IEnumerator Wait(float _waitTime)
     {
         _isDead = true;
         yield return new WaitForSeconds(_waitTime);
         // emit player death event
-        EventManager.TriggerEvent("PlayerDeath");
+        GameEvents.RaisePlayerDeath();
     }
 
     public void ApplyDamage(int damage = 0)
@@ -134,9 +123,9 @@ public class Player : MonoBehaviour
 
         _healthBar.SetHealth(1.0f * _hitPoints / _maxHitPoints);
 
-        if (_hitPoints == 0)
+        if (_hitPoints <= 0)
         {
-            animator.SetTrigger("Dead");
+            animator.SetTrigger(Dead);
             coroutine = Wait(1.2f);
             StartCoroutine(coroutine);
         }
@@ -150,7 +139,7 @@ public class Player : MonoBehaviour
     public void ApplyHeal(int healAmount = 0)
     {
         _hitPoints += healAmount;
-        _hitPoints = Math.Min(_hitPoints, 100); // don't let the player have more than 100 hit points
+        _hitPoints = Math.Min(_hitPoints, _maxHitPoints);
 
         _healthBar.SetHealth(1.0f * _hitPoints / _maxHitPoints);
     }
@@ -194,18 +183,10 @@ public class Player : MonoBehaviour
             _damageReductionAmount = 0f;
         }
     }
-    
+
     public void SpawnPlayerText(string text)
     {
         Vector2 textPosition = new Vector2(transform.position.x, transform.position.y + 1.0f);
         _playerTextPrefab.Spawn(transform.root, textPosition, text);
-    }
-    
-    private void OnDestroy()
-    {
-        if (_instance == this)
-        {
-            _instance = null;
-        }
     }
 }
