@@ -90,5 +90,14 @@ public static class RunTrace
     public static void ClearScopeTransaction()
     {
         SentrySdk.ConfigureScope(scope => scope.Transaction = null);
+
+        // Defensive: finishing a scope transaction can regenerate the scope's propagation
+        // context, which scope-sync mirrors to the native layer -- a native crash between two
+        // transactions would then land on a fresh random trace instead of the run's. Re-point
+        // at the run so the window never opens, whatever the SDK's finish behavior is.
+        if (_current is not null)
+        {
+            SentrySdk.ContinueTrace(_current, null);
+        }
     }
 }
