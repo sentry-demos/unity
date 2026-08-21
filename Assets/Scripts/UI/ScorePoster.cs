@@ -2,6 +2,9 @@ using System;
 #if !UNITY_SWITCH
 using System.Net.Http;
 #endif
+#if UNITY_STANDALONE_WIN
+using System.Runtime.InteropServices;
+#endif
 using System.Threading.Tasks;
 using Sentry;
 using Sentry.Unity;
@@ -35,6 +38,13 @@ public class ScorePoster : MonoBehaviour
     private DemoConfiguration _demoConfig;
     private TextMeshProUGUI _buttonText;
 
+    // For HUDManager, which drives controller navigation across the game-over screen.
+    public TMP_InputField NameField => _nameField;
+    public Button SubmitButton => _submitButton;
+
+    /// <summary>Raised when the on-screen keyboard closes and the name field has text.</summary>
+    public event Action OnVirtualKeyboardClosedWithText;
+
     private string _jwtToken;
 #if !UNITY_SWITCH
     private HttpClient _httpClient;
@@ -45,12 +55,60 @@ public class ScorePoster : MonoBehaviour
     private bool _isUploading;
     private bool _uploadSucceeded;
 
+    private TouchScreenKeyboard _keyboard;
+    private bool _keyboardWasActive;
+    // TMP_InputField reverts to its original text when the user cancels (ESC / keyboard
+    // dismissed), which threw away a typed name. Kept here to restore it.
+    private string _savedName = "";
+
+#if UNITY_STANDALONE_WIN
+    // Windows handhelds (e.g. ROG Ally) report no touch keyboard support, so the WinRT
+    // gamepad keyboard is driven explicitly through this helper. The DLL is optional;
+    // every call is wrapped so its absence just means no on-screen keyboard.
+    [DllImport("HandheldHelper")] private static extern bool ShowVirtualKeyboard();
+    [DllImport("HandheldHelper")] private static extern bool HideVirtualKeyboard();
+    [DllImport("HandheldHelper")] private static extern bool IsDeviceHandheld();
+#endif
+
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
 
         _submitButton.onClick.AddListener(OnSubmit);
+
+        // Nothing to post until a name is typed.
+        _submitButton.interactable = false;
+        _nameField.onValueChanged.AddListener(OnNameValueChanged);
+        _nameField.onEndEdit.AddListener(OnNameEndEdit);
+
+        // Keep the Unity input field visible next to the native keyboard on platforms
+        // that show one (mobile, Switch).
+        _nameField.shouldHideMobileInput = false;
+
+        if (TouchScreenKeyboard.isSupported)
+        {
+            // Platforms with a native on-screen keyboard (mobile, Switch) need it opened
+            // explicitly when the field is selected via controller navigation.
+            _nameField.onSelect.AddListener(OnInputFieldSelected);
+        }
+#if UNITY_STANDALONE_WIN
+        else
+        {
+            try
+            {
+                if (IsDeviceHandheld())
+                {
+                    _nameField.onSelect.AddListener(OnInputFieldSelected);
+                    _nameField.onDeselect.AddListener(OnInputFieldDeselected);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"HandheldHelper unavailable: {ex.Message}");
+            }
+        }
+#endif
     }
 
     private void Start()
@@ -70,17 +128,127 @@ public class ScorePoster : MonoBehaviour
         if (_jwtToken != null)
         {
             _root.SetActive(true);
+            _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameField.text);
+        }
+    }
+
+    private void Update()
+    {
+        // Mirror the native on-screen keyboard's text into the input field while it is open,
+        // and detect the close so navigation can move on to Submit.
+        if (_keyboard != null && _keyboard.active)
+        {
+            _nameField.text = _keyboard.text;
+            _keyboardWasActive = true;
+        }
+        else if (_keyboardWasActive)
+        {
+            if (_keyboard != null)
+            {
+                _nameField.text = _keyboard.text;
+            }
+            _keyboardWasActive = false;
+            if (!string.IsNullOrEmpty(_nameField.text))
+            {
+                OnVirtualKeyboardClosedWithText?.Invoke();
+            }
         }
     }
 
     private void OnDestroy()
     {
+        if (_nameField != null)
+        {
+            _nameField.onSelect.RemoveListener(OnInputFieldSelected);
+            _nameField.onValueChanged.RemoveListener(OnNameValueChanged);
+            _nameField.onEndEdit.RemoveListener(OnNameEndEdit);
+#if UNITY_STANDALONE_WIN
+            _nameField.onDeselect.RemoveListener(OnInputFieldDeselected);
+#endif
+        }
+
 #if !UNITY_SWITCH
         // "Try Again" reloads the scene, so this would otherwise leak per reload.
         _httpClient?.Dispose();
         _httpClient = null;
 #endif
     }
+
+    private void OnNameValueChanged(string text)
+    {
+        if (_uploadSucceeded || _isUploading)
+        {
+            return;
+        }
+        if (!string.IsNullOrEmpty(text))
+        {
+            _savedName = text;
+        }
+        _submitButton.interactable = !string.IsNullOrEmpty(text);
+    }
+
+    private void OnNameEndEdit(string text)
+    {
+        if (_uploadSucceeded)
+        {
+            return;
+        }
+        // TMP_InputField reverts to its original text when the user cancels. If the field is
+        // now empty but a name was typed earlier, restore it.
+        if (string.IsNullOrEmpty(text) && !string.IsNullOrEmpty(_savedName))
+        {
+            _nameField.SetTextWithoutNotify(_savedName);
+            _submitButton.interactable = !_isUploading;
+        }
+    }
+
+    private void OnInputFieldSelected(string text)
+    {
+        if (TouchScreenKeyboard.isSupported)
+        {
+            _keyboard = TouchScreenKeyboard.Open(
+                _nameField.text,
+                TouchScreenKeyboardType.Default,
+                false, // autocorrection
+                false, // multiline
+                false, // secure
+                false, // alert
+                _nameField.placeholder.GetComponent<TextMeshProUGUI>().text
+            );
+        }
+#if UNITY_STANDALONE_WIN
+        else
+        {
+            // Only reachable on a Windows handheld: the listener is not added otherwise.
+            try
+            {
+                ShowVirtualKeyboard();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Failed to show virtual keyboard: {ex.Message}");
+            }
+        }
+#endif
+    }
+
+#if UNITY_STANDALONE_WIN
+    private void OnInputFieldDeselected(string text)
+    {
+        try
+        {
+            HideVirtualKeyboard();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Failed to hide virtual keyboard: {ex.Message}");
+        }
+        if (!string.IsNullOrEmpty(_nameField.text))
+        {
+            OnVirtualKeyboardClosedWithText?.Invoke();
+        }
+    }
+#endif
 
     private async Task LoginAsync()
     {
@@ -215,7 +383,16 @@ public class ScorePoster : MonoBehaviour
         {
             _isUploading = false;
 
-            _submitButton.interactable = !_uploadSucceeded;
+            if (_uploadSucceeded)
+            {
+                // Lock the entry so navigation and typing can't re-submit or edit the name.
+                _submitButton.interactable = false;
+                _nameField.interactable = false;
+            }
+            else
+            {
+                _submitButton.interactable = !string.IsNullOrEmpty(_nameField.text);
+            }
         }
     }
 

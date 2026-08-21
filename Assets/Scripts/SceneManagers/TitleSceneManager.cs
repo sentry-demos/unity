@@ -32,6 +32,9 @@ namespace SceneManagers
 
         private void Start()
         {
+            // Pre-select Start so a controller has a focused button without touching the stick.
+            SetHighlightedButton(_startHighlighter);
+
             if (_demoConfig != null && _demoConfig.AutoPlay)
             {
                 StartCoroutine(AutoStartGame());
