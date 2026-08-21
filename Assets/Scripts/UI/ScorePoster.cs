@@ -72,8 +72,9 @@ public class ScorePoster : MonoBehaviour
 
     private async Task LoginAsync()
     {
-        var transaction = SentrySdk.StartTransaction("scoreposter", "login");
-        SentrySdk.ConfigureScope(scope => scope.Transaction = transaction);
+        // On the run's trace: the score being posted is the last act of the run that earned it.
+        var transaction = RunTrace.StartTransaction("scoreposter", "login");
+        RunTrace.SetScopeTransaction(transaction);
 
         try
         {
@@ -106,6 +107,10 @@ public class ScorePoster : MonoBehaviour
             GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "error"));
             transaction.Finish(SpanStatus.InternalError);
             _jwtToken = null;
+        }
+        finally
+        {
+            RunTrace.ClearScopeTransaction();
         }
     }
 
@@ -179,8 +184,8 @@ public class ScorePoster : MonoBehaviour
         var json = JsonUtility.ToJson(score);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-        var uploadTransaction = SentrySdk.StartTransaction("scoreposter", "upload");
-        SentrySdk.ConfigureScope(scope => scope.Transaction = uploadTransaction);
+        var uploadTransaction = RunTrace.StartTransaction("scoreposter", "upload");
+        RunTrace.SetScopeTransaction(uploadTransaction);
 
         // Inside the transaction, so a spike in the failure count leads straight to a trace.
         var started = System.Diagnostics.Stopwatch.StartNew();
@@ -230,6 +235,8 @@ public class ScorePoster : MonoBehaviour
                 MeasurementUnit.Duration.Millisecond,
                 (GameMetrics.ResultKey, result)
             );
+
+            RunTrace.ClearScopeTransaction();
         }
     }
 }

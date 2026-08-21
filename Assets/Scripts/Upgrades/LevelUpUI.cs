@@ -209,8 +209,11 @@ namespace Upgrades
         // costs the player that upgrade. Fix the caller, not the parsing.
         private List<UpgradePathBase> GetUpgrades()
         {
-            var fetchTransaction = SentrySdk.StartTransaction("fetch_upgrades", "http.client");
-            SentrySdk.ConfigureScope(scope => scope.Transaction = fetchTransaction);
+            // On the run's trace, so the level-up that triggered this fetch and the error it
+            // throws read as one story. The op describes the fetch as a whole; the outgoing
+            // request underneath it is the http.client span.
+            var fetchTransaction = RunTrace.StartTransaction("fetch_upgrades", "ui.upgrade.fetch");
+            RunTrace.SetScopeTransaction(fetchTransaction);
 
             // Emitted inside the transaction, so every one of these metrics is trace
             // connected: the count that goes up leads to the trace that explains it.
@@ -226,7 +229,10 @@ namespace Upgrades
                 {
                     Debug.LogWarning("Upgrade parsing failed, falling back to local upgrades");
                     result = "parse_failed";
-                    fetchTransaction.Finish(SpanStatus.Ok);
+
+                    // The parse span already finished InternalError. Finishing the parent Ok
+                    // reported the transaction as a success whose child had failed.
+                    fetchTransaction.Finish(SpanStatus.InternalError);
                     return null;
                 }
 
@@ -255,18 +261,24 @@ namespace Upgrades
                     MeasurementUnit.Duration.Millisecond,
                     (GameMetrics.ResultKey, result)
                 );
+
+                RunTrace.ClearScopeTransaction();
             }
         }
 
         private string FetchUpgradeDataFromServer(ITransactionTracer transaction)
         {
-            var processDataSpan = transaction.StartChild("task", "process_level_data");
+            // Named for what it covers: this runs before the request goes out, so the old
+            // "process_level_data" read as post-processing that had not happened yet.
+            var prepareSpan = transaction.StartChild("task", "prepare_upgrade_request");
 
             var currentLevel = _gameManager.GetCurrentLevel();
 
-            System.Threading.Tasks.Task.Delay((int)(Random.value * 100)).Wait(); // Simulate some work to be done
+            // Floored, because an unfloored Random.value put 0.02ms spans in the distribution
+            // next to 90ms ones and made the span look broken rather than simulated.
+            System.Threading.Tasks.Task.Delay((int)(20 + Random.value * 80)).Wait(); // Simulate some work to be done
 
-            processDataSpan.Finish();
+            prepareSpan.Finish();
 
             const string domain = "https://aspnetcore.empower-plant.com";
             const string upgradesEndpoint = "/reviews";

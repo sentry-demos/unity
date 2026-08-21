@@ -43,6 +43,10 @@ public class BattleMetrics
 
     public void RunStarted(float now, int startingLevel)
     {
+        // First, so that everything below -- and everything the run goes on to report -- lands
+        // on the run's own trace rather than whatever the scope was holding.
+        RunTrace.Begin();
+
         GameMetrics.ResetRun();
         GameMetrics.SetLevel(startingLevel);
 
