@@ -44,6 +44,13 @@ namespace SceneManagers
         private float _lastNavTime;
         private const float NavCooldown = 0.2f;
 
+        // Graphic.DOColor lives in DOTween's UI module, which compiles into
+        // Assembly-CSharp-firstpass and is not visible from this asmdef assembly - only the
+        // precompiled DOTween core is. The generic To() covers the same ground.
+        private Tween TweenSubmitColor(Color target) =>
+            DOTween.To(() => _submitGraphic.color, c => _submitGraphic.color = c, target, 0.1f)
+                .SetUpdate(true);
+
         private void Awake()
         {
             _navigateAction = InputSystem.actions.FindAction("Navigate");
@@ -312,7 +319,7 @@ namespace SceneManagers
             if (_highlightedButton == _submitButton?.gameObject && _submitNormalColorCaptured && _submitGraphic != null)
             {
                 _submitColorTween?.Kill();
-                _submitColorTween = _submitGraphic.DOColor(_submitNormalColor, 0.1f).SetUpdate(true);
+                _submitColorTween = TweenSubmitColor(_submitNormalColor);
             }
 
             highlighted.Highlight();
@@ -328,7 +335,7 @@ namespace SceneManagers
                     _submitNormalColorCaptured = true;
                 }
                 _submitColorTween?.Kill();
-                _submitColorTween = _submitGraphic.DOColor(_submitHighlightColor, 0.1f).SetUpdate(true);
+                _submitColorTween = TweenSubmitColor(_submitHighlightColor);
             }
         }
 
@@ -342,7 +349,7 @@ namespace SceneManagers
             if (_submitNormalColorCaptured && _submitGraphic != null)
             {
                 _submitColorTween?.Kill();
-                _submitColorTween = _submitGraphic.DOColor(_submitNormalColor, 0.1f).SetUpdate(true);
+                _submitColorTween = TweenSubmitColor(_submitNormalColor);
             }
 
             _highlightedButton = null;
