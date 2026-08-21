@@ -57,6 +57,16 @@ public class Enemy : MonoBehaviour
     private bool _isDead = false;
 
     /// <summary>
+    /// Which prefab this enemy came from, as a metric attribute.
+    /// </summary>
+    /// <remarks>
+    /// Read from the object name rather than the C# type: the sentaur, the ant and the
+    /// mantis all use this component unmodified, so <c>GetType()</c> cannot tell them apart.
+    /// The prefab set is small and fixed, which is what keeps the attribute bounded.
+    /// </remarks>
+    public string Kind { get; private set; }
+
+    /// <summary>
     /// Whether this enemy is dying or dead. Set the moment it is killed, which is up to
     /// <c>_deathAnimDuration</c> before the object is destroyed -- targeting has to skip it
     /// for that whole window, or shots chase a corpse that is shrinking out of existence.
@@ -71,6 +81,8 @@ public class Enemy : MonoBehaviour
 
     protected virtual void Awake()
     {
+        Kind = GameMetrics.PrefabKind(name);
+
         _spriteRenderer = GetComponent<SpriteRenderer>();
         _rigidbody2D = GetComponent<Rigidbody2D>();
 
@@ -180,7 +192,7 @@ public class Enemy : MonoBehaviour
     // Deal damage to the player because they touched
     private void DamagePlayer(Player player)
     {
-        GameLog.Trace("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
+        Debug.Log("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
 
         player.ApplyDamage(_collisionDamage);
     }
@@ -195,6 +207,9 @@ public class Enemy : MonoBehaviour
 
         Flash();
 
+        // Recorded rather than emitted: a swarm takes hundreds of hits a second between them.
+        GameMetrics.RecordDamageDealt(damage);
+
         hitpoints -= damage;
         hitpoints = Mathf.Max(hitpoints, 0); // don't let the enemy have negative hit points
 
@@ -206,6 +221,7 @@ public class Enemy : MonoBehaviour
         {
             Death(leaveXp: true);
 
+            GameMetrics.RecordEnemyKilled(Kind);
             GameEvents.RaiseEnemyDestroyed(_scoreValue);
         }
     }

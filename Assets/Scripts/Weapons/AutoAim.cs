@@ -187,6 +187,10 @@ public class AutoAim : MonoBehaviour
     /// </summary>
     private void Scan()
     {
+#if SENTAUR_PERF_METRICS
+        var scanStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+#endif
+
         _rankedTargets.Clear();
 
         var position = transform.position;
@@ -237,6 +241,16 @@ public class AutoAim : MonoBehaviour
         }
 
         PickRearTarget(position);
+
+#if SENTAUR_PERF_METRICS
+        // Off by default: this runs several times a second per weapon, and the timing is
+        // only worth its own cost while the scan is actually under suspicion. Add
+        // SENTAUR_PERF_METRICS to the target's scripting define symbols to turn it on.
+        var elapsed = System.Diagnostics.Stopwatch.GetTimestamp() - scanStarted;
+        GameMetrics.RecordAutoAimScan(
+            elapsed * 1_000_000.0 / System.Diagnostics.Stopwatch.Frequency
+        );
+#endif
     }
 
     /// <summary>

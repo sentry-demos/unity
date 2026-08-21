@@ -4,7 +4,7 @@ name: Run Demo Builds
 # workflow directly, and having both would run every demo twice for each build.
 on:
   schedule:
-    - cron: '*/50 * * * *' # every 50 minutes
+    - cron: '*/10 * * * *' # every 10 minutes
   workflow_call:
     inputs:
       build-run-id:

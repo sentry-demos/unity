@@ -61,6 +61,13 @@ public class EnemySpawner : MonoBehaviour
     private WaveFormation _waveFormation;
 
     /// <summary>
+    /// How many enemies are in the scene, derived from the parent's child count the same way
+    /// <see cref="PickupSpawner.OnScreen"/> is. Counts the ones playing their death animation
+    /// too -- they are still costing a transform and a sprite until Destroy lands.
+    /// </summary>
+    public int EnemiesAlive => _enemiesParentTransform.childCount;
+
+    /// <summary>
     /// Hands over the rules objects the manager owns. Called before any spawning; the
     /// spawner has no useful behaviour until it is.
     /// </summary>
@@ -80,6 +87,15 @@ public class EnemySpawner : MonoBehaviour
         var waveSize = DifficultyCurve.AdjustWaveSizeForType(
             Random.Range(1, _difficulty.MaxWaveSize(level)),
             spawnChoice
+        );
+
+        // Per wave rather than per enemy: the wave is the decision the difficulty curve
+        // made, and the size rides along as the attribute.
+        GameMetrics.Count(
+            GameMetrics.EnemySpawned,
+            waveSize,
+            (GameMetrics.TypeKey, spawnChoice.ToString()),
+            (GameMetrics.SizeKey, waveSize)
         );
 
         SpawnFannedOut(PrefabFor(spawnChoice), waveSize);
@@ -107,6 +123,13 @@ public class EnemySpawner : MonoBehaviour
 
     private void SpawnLinearWave(int count, LinearEnemy.Direction direction)
     {
+        GameMetrics.Count(
+            GameMetrics.EnemySpawned,
+            count,
+            (GameMetrics.TypeKey, DifficultyCurve.EnemyType.LinearHead.ToString()),
+            (GameMetrics.SizeKey, count)
+        );
+
         var initialPosition =
             Player.Instance.transform.position
             + _waveFormation.LinearWaveStartOffset(count, direction);

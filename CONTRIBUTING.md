@@ -59,6 +59,15 @@ That's deliberate. Most of the violations still in the codebase are on Unity-ser
 
 New code should follow the naming rules from the start.
 
+### Logging
+
+Use `Debug.Log` directly. If you want logs out of a build, turn them off in the build settings rather than wrapping them in something.
+
+Two things to know:
+
+* **Some log lines are a contract with CI.** The demo run greps the player log to decide whether a build passed, so those strings live in two places at once. They're at the top of [`.github/scripts/lib/DemoRun.psm1`](.github/scripts/lib/DemoRun.psm1): `"Start Game"` in `TitleSceneManager.StartGame` proves the build reached gameplay, `"Attempting save_score_to_disk"` in `BattleSceneManager` proves it reached the native crash. **Change one of those log lines and you change the script too**, or the demo job fails with nothing visibly wrong in the game.
+* **Logs reach Sentry.** `Assets/Resources/Sentry/SentryOptions.asset` has `StructuredLogOnDebugLog` and `BreadcrumbsForLogs` on, so each line is sent as a structured log and takes one of `MaxBreadcrumbs` (100) slots. Worth remembering before adding one to a per-frame or per-collision path, where it'll push the run-up to the crash out of the breadcrumb trail. High-frequency signal is better off in `GameMetrics.Record*`, which accumulates and drains once a second.
+
 ## Folders
 
 ### Assets/Prefabs

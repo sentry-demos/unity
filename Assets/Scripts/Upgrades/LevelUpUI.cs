@@ -1,12 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Sentry;
 using Sentry.Unity;
 using UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Debug = UnityEngine.Debug;
 using Random = UnityEngine.Random;
 
 namespace Upgrades
@@ -65,6 +67,7 @@ namespace Upgrades
             if (paths == null || paths.Count == 0)
             {
                 Debug.LogWarning("No upgrade paths available. Everything fully upgraded?");
+                GameMetrics.Count(GameMetrics.UpgradePoolExhausted, 1);
                 Time.timeScale = 1;
                 gameObject.SetActive(false);
                 return;
@@ -91,25 +94,25 @@ namespace Upgrades
         private IEnumerator SelectSomething()
         {
             var delay = Random.value;
-            GameLog.Trace($"Starting to select in {delay} seconds");
+            Debug.Log($"Starting to select in {delay} seconds");
             yield return new WaitForSecondsRealtime(delay);
 
-            GameLog.Trace("Done waiting");
+            Debug.Log("Done waiting");
 
             if (Random.value > 0.5f)
             {
-                GameLog.Trace("Selected left");
+                Debug.Log("Selected left");
                 SetHighlightedButton(_option1Button);
             }
             else
             {
-                GameLog.Trace("Selected right");
+                Debug.Log("Selected right");
                 SetHighlightedButton(_option2Button);
             }
 
             yield return new WaitForSecondsRealtime(Random.value);
 
-            GameLog.Trace("Clicking the highlighted button");
+            Debug.Log("Clicking the highlighted button");
             _highlightedButton?.GetComponent<Button>().onClick.Invoke();
         }
 
@@ -206,8 +209,16 @@ namespace Upgrades
         // costs the player that upgrade. Fix the caller, not the parsing.
         private List<UpgradePathBase> GetUpgrades()
         {
-            var fetchTransaction = SentrySdk.StartTransaction("fetch_upgrades", "http.client");
-            SentrySdk.ConfigureScope(scope => scope.Transaction = fetchTransaction);
+            // On the run's trace, so the level-up that triggered this fetch and the error it
+            // throws read as one story. The op describes the fetch as a whole; the outgoing
+            // request underneath it is the http.client span.
+            var fetchTransaction = RunTrace.StartTransaction("fetch_upgrades", "ui.upgrade.fetch");
+            RunTrace.SetScopeTransaction(fetchTransaction);
+
+            // Emitted inside the transaction, so every one of these metrics is trace
+            // connected: the count that goes up leads to the trace that explains it.
+            var started = Stopwatch.StartNew();
+            var result = "error";
 
             try
             {
@@ -217,9 +228,18 @@ namespace Upgrades
                 if (upgrades == null)
                 {
                     Debug.LogWarning("Upgrade parsing failed, falling back to local upgrades");
-                    fetchTransaction.Finish(SpanStatus.Ok);
+                    result = "parse_failed";
+
+                    // The parse span already finished InternalError. Finishing the parent Ok
+                    // reported the transaction as a success whose child had failed.
+                    fetchTransaction.Finish(SpanStatus.InternalError);
                     return null;
                 }
+
+                // Distinct from "ok" on purpose. A parse that succeeds but maps nothing skips
+                // the caller's fallback and costs the player the upgrade, and the only thing
+                // that separates it from a healthy fetch is the count being zero.
+                result = upgrades.Count > 0 ? "ok" : "empty";
 
                 fetchTransaction.Finish(SpanStatus.Ok);
                 return upgrades;
@@ -232,17 +252,33 @@ namespace Upgrades
 
                 return null;
             }
+            finally
+            {
+                GameMetrics.Count(GameMetrics.UpgradeFetch, 1, (GameMetrics.ResultKey, result));
+                GameMetrics.Distribution(
+                    GameMetrics.UpgradeFetchDuration,
+                    started.Elapsed.TotalMilliseconds,
+                    MeasurementUnit.Duration.Millisecond,
+                    (GameMetrics.ResultKey, result)
+                );
+
+                RunTrace.ClearScopeTransaction();
+            }
         }
 
         private string FetchUpgradeDataFromServer(ITransactionTracer transaction)
         {
-            var processDataSpan = transaction.StartChild("task", "process_level_data");
+            // Named for what it covers: this runs before the request goes out, so the old
+            // "process_level_data" read as post-processing that had not happened yet.
+            var prepareSpan = transaction.StartChild("task", "prepare_upgrade_request");
 
             var currentLevel = _gameManager.GetCurrentLevel();
 
-            System.Threading.Tasks.Task.Delay((int)(Random.value * 100)).Wait(); // Simulate some work to be done
+            // Floored, because an unfloored Random.value put 0.02ms spans in the distribution
+            // next to 90ms ones and made the span look broken rather than simulated.
+            System.Threading.Tasks.Task.Delay((int)(20 + Random.value * 80)).Wait(); // Simulate some work to be done
 
-            processDataSpan.Finish();
+            prepareSpan.Finish();
 
             const string domain = "https://aspnetcore.empower-plant.com";
             const string upgradesEndpoint = "/reviews";

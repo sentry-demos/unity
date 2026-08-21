@@ -17,7 +17,7 @@ MonoBehaviour:
   <UploadSources>k__BackingField: 1
   <UrlOverride>k__BackingField: 
   <Auth>k__BackingField: 
-  <Organization>k__BackingField: demo
-  <Project>k__BackingField: unity
+  <Organization>k__BackingField: 
+  <Project>k__BackingField: 
   <IgnoreCliErrors>k__BackingField: 0
   <CliOptionsConfiguration>k__BackingField: {fileID: 11400000, guid: f1bf305bff70d481482767f93449ff03, type: 2}
