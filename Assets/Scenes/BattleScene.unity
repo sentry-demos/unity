@@ -7969,6 +7969,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tryAgainButton: {fileID: 1730555519}
   quitButton: {fileID: 170557571}
+  _scorePoster: {fileID: 1394716927}
 --- !u!1001 &719918155
 PrefabInstance:
   m_ObjectHideFlags: 0
