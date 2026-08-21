@@ -33,6 +33,7 @@ namespace Upgrades
         private Button _option1Button;
         private Button _option2Button;
         private Button _highlightedButton;
+        private int _lastNavZone = 0; // -1 = left, 0 = neutral, 1 = right
 
         private void Awake()
         {
@@ -51,6 +52,7 @@ namespace Upgrades
             InputSystem.actions.FindActionMap("UI").Enable();
 
             // Subscribe to input events
+            _lastNavZone = 0;
             _navigateAction.performed += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
 
@@ -68,8 +70,7 @@ namespace Upgrades
             {
                 Debug.LogWarning("No upgrade paths available. Everything fully upgraded?");
                 GameMetrics.Count(GameMetrics.UpgradePoolExhausted, 1);
-                Time.timeScale = 1;
-                gameObject.SetActive(false);
+                ResumeGameplay();
                 return;
             }
 
@@ -123,12 +124,23 @@ namespace Upgrades
                 return;
             }
 
+            // Zone-based hysteresis: holding the stick to one side fires Navigate every frame,
+            // which used to flip the highlight continuously. Only react when the stick moves
+            // into a different zone.
             var direction = context.ReadValue<Vector2>();
-            if (direction.x < 0)
+            var zone = direction.x < -0.5f ? -1 : direction.x > 0.5f ? 1 : 0;
+
+            if (zone == _lastNavZone)
+            {
+                return;
+            }
+            _lastNavZone = zone;
+
+            if (zone == -1)
             {
                 SetHighlightedButton(_option1Button);
             }
-            else if (direction.x > 0)
+            else if (zone == 1)
             {
                 SetHighlightedButton(_option2Button);
             }
@@ -190,12 +202,21 @@ namespace Upgrades
 
         private void SelectUpgrade(UpgradePathBase selectedUpgrade)
         {
-            InputSystem.actions.FindActionMap("Player").Enable();
-            InputSystem.actions.FindActionMap("UI").Disable();
-
             UpgradeManager.Instance.LevelUpUpgradePath(selectedUpgrade);
 
             // Resume the game and exit the level up popup
+            ResumeGameplay();
+        }
+
+        // Restores control to the player and closes the popup. Must be called on EVERY exit
+        // path from the level-up screen: OnEnable disables the "Player" action map, so an exit
+        // that only resumes time (e.g. when the upgrade pool is exhausted) leaves the player
+        // frozen in place with no movement input while the game keeps running.
+        private void ResumeGameplay()
+        {
+            InputSystem.actions.FindActionMap("Player").Enable();
+            InputSystem.actions.FindActionMap("UI").Disable();
+
             Time.timeScale = 1;
             gameObject.SetActive(false);
         }
