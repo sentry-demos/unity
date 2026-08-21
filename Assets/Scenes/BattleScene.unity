@@ -7955,7 +7955,7 @@ MonoBehaviour:
   _gameOverScoreText: {fileID: 1693517684}
   _tryAgain: {fileID: 1730555519}
   _quit: {fileID: 170557571}
-  _hudManager: {fileID: 0}
+  _hudManager: {fileID: 715298360}
 --- !u!114 &715298360
 MonoBehaviour:
   m_ObjectHideFlags: 0
