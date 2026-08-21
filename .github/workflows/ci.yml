@@ -7,93 +7,387 @@ on:
   pull_request:
   workflow_dispatch: # e.g. to manually trigger on foreign PRs
   schedule:
-    - cron: '0 0 * * 0' # Weekly on Sunday at midnight to ensure artifacts don't expire
+    - cron: "0 0 * * 0"
+
+# The build jobs are chained and only one run holds this group at a time.
+concurrency:
+  group: unity-floating-license
+  cancel-in-progress: true
 
 jobs:
-  cancel-previous-workflow:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@b173b6ec0100793626c2d9e6b90435061f4fc3e5 # pin@0.11.0
-        with:
-          access_token: ${{ github.token }}
+  build-macos:
+    name: Build macOS and iOS
+    runs-on: macos-15
+    env:
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
 
-  build:
-    name: Build for ${{ matrix.targetPlatform }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - targetPlatform: StandaloneWindows64
-            os: windows-2022
-          - targetPlatform: Android
-            os: ubuntu-latest
-    
     steps:
-      - name: Free disk space # Android builds runs out of disk space otherwise
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          df -h
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
 
-      - name: Set Unity Version
-        shell: bash
+      - name: Fingerprint macOS build
+        id: fingerprint-macos
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneOSX
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Fingerprint iOS build
+        id: fingerprint-ios
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: iOS
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      # The archives are cached rather than the build directories: they are what the
+      # artifacts are made of, and taring first avoids the symlink and permission
+      # damage a cache round trip does to a .app bundle.
+      - name: Restore cached macOS player
+        id: cached-macos
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-macos.outputs.key }}
+          path: SentaurSurvivors-macOS.tar.gz
+
+      - name: Restore cached iOS player
+        id: cached-ios
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-ios.outputs.key }}
+          path: SentaurSurvivors-iOS.tar.gz
+
+      # Both players come out of one Unity session, so the editor is only needed when
+      # at least one of them missed the cache.
+      - name: Determine whether Unity is needed
+        id: unity-needed
+        shell: pwsh
         run: |
-          UNITY_VERSION=$(grep 'm_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')
-          echo "UNITY_VERSION=$UNITY_VERSION" >> $GITHUB_ENV
+          $needed = '${{ steps.cached-macos.outputs.hit }}' -ne 'true' -or
+                    '${{ steps.cached-ios.outputs.hit }}' -ne 'true'
+          "result=$($needed.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($needed) {
+            Write-Host 'Building: at least one player was not cached.'
+          } else {
+            Write-Host 'Both players restored from cache - skipping Unity entirely.'
+          }
 
       - name: Cache Unity Library
-        uses: actions/cache@v4
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/cache-unity-library
         with:
-          path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json') }}
-          restore-keys: |
-            Library-${{ matrix.targetPlatform }}-${{ env.UNITY_VERSION }}-
-            Library-${{ matrix.targetPlatform }}-
+          target: StandaloneOSX
 
-      - name: Cache Build Output
-        uses: actions/cache@v4
-        id: cache-build
+      - name: Set up Unity
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/setup-unity
         with:
-          path: build
-          key: build-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            build-${{ matrix.targetPlatform }}-
+          modules: mac-il2cpp ios
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
 
-      - run: echo "::add-mask::${{ secrets.LICENSE_SERVER_URL }}"
-
-      - uses: game-ci/unity-builder@v4
-        if: steps.cache-build.outputs.cache-hit != 'true'
+      - name: Build macOS player
+        if: steps.cached-macos.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
         with:
-          unityVersion: ${{ env.UNITY_VERSION }}
-          targetPlatform: ${{ matrix.targetPlatform }}
-          unityLicensingServer: ${{ secrets.LICENSE_SERVER_URL }}
-          buildName: SentaurSurvivors-${{ matrix.targetPlatform }}
-          customParameters: -dsn ${{ secrets.DSN }} -auth_token ${{ secrets.AUTH_TOKEN }} # Arguments cannot be passed via ENV
-          allowDirtyBuild: true
+          target: StandaloneOSX
+          output-path: Build/StandaloneOSX/SentaurSurvivors.app
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      # Tar the bundle: upload-artifact drops the executable bit and flattens the
+      # symlinks that the .app relies on to launch.
+      - name: Create macOS archive
+        if: steps.cached-macos.outputs.hit != 'true'
+        shell: bash
+        run: tar -czf SentaurSurvivors-macOS.tar.gz -C Build/StandaloneOSX SentaurSurvivors.app
+
+      - name: Build iOS Xcode project
+        if: steps.cached-ios.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
+        with:
+          target: iOS
+          output-path: Build/iOS
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Compile iOS Xcode project
+        if: steps.cached-ios.outputs.hit != 'true'
+        shell: pwsh
+        run: ./.github/scripts/compile-xcode-project.ps1 -ProjectPath Build/iOS
+
+      - name: Create iOS archive
+        if: steps.cached-ios.outputs.hit != 'true'
+        shell: bash
+        run: |
+          tar -czf SentaurSurvivors-iOS.tar.gz \
+            -C Build/iOS/archive/Unity-iPhone/Build/Products/Release-iphonesimulator SentaurSurvivors.app
+
+      - name: Upload macOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneOSX
+          path: SentaurSurvivors-macOS.tar.gz
+          retention-days: 90
+
+      - name: Upload iOS Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-iOS
+          path: SentaurSurvivors-iOS.tar.gz
+          retention-days: 90
+
+      - name: Cache macOS player
+        if: steps.cached-macos.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-macos.outputs.key }}
+          path: SentaurSurvivors-macOS.tar.gz
+          save: true
+
+      - name: Cache iOS player
+        if: steps.cached-ios.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-ios.outputs.key }}
+          path: SentaurSurvivors-iOS.tar.gz
+          save: true
+
+      - name: Save Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneOSX
+          save: true
+
+  build-windows:
+    name: Build Windows
+    needs: build-macos
+    # Not always(): that would keep the chain going after the run is cancelled.
+    # !cancelled() still runs this when the previous build failed.
+    if: ${{ !cancelled() }}
+    runs-on: windows-2022
+    env:
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Fingerprint Windows build
+        id: fingerprint
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneWindows64
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Restore cached Windows player
+        id: cached
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+
+      - name: Cache Unity Library
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneWindows64
+
+      - name: Set up Unity
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: windows-il2cpp
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
+
+      - name: Build Windows player
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneWindows64
+          output-path: Build/StandaloneWindows64/SentaurSurvivors.exe
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: SentaurSurvivors-${{ matrix.targetPlatform }}
-          path: build
+          name: SentaurSurvivors-StandaloneWindows64
+          path: Build/StandaloneWindows64
           retention-days: 90
+
+      - name: Cache Windows player
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint.outputs.key }}
+          path: Build/StandaloneWindows64
+          save: true
+
+      - name: Save Unity Library
+        if: steps.cached.outputs.hit != 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneWindows64
+          save: true
+
+  build-linux:
+    name: Build Linux and Android
+    needs: build-windows
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    env:
+      UNITY_NO_CONSENT_PROMPT: 1
+      UNITY_NO_UPDATE_CHECK: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Fingerprint Linux build
+        id: fingerprint-linux
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: StandaloneLinux64
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Fingerprint Android build
+        id: fingerprint-android
+        uses: ./.github/actions/build-fingerprint
+        with:
+          target: Android
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Restore cached Linux player
+        id: cached-linux
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-linux.outputs.key }}
+          path: Build/StandaloneLinux64
+
+      - name: Restore cached Android player
+        id: cached-android
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-android.outputs.key }}
+          path: Build/Android
+
+      # Both players come out of one Unity session, so the editor is only needed when
+      # at least one of them missed the cache.
+      - name: Determine whether Unity is needed
+        id: unity-needed
+        shell: pwsh
+        run: |
+          $needed = '${{ steps.cached-linux.outputs.hit }}' -ne 'true' -or
+                    '${{ steps.cached-android.outputs.hit }}' -ne 'true'
+          "result=$($needed.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if ($needed) {
+            Write-Host 'Building: at least one player was not cached.'
+          } else {
+            Write-Host 'Both players restored from cache - skipping Unity entirely.'
+          }
+
+      - name: Cache Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneLinux64
+
+      - name: Set up Unity
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/setup-unity
+        with:
+          modules: linux-il2cpp android
+          license-server-url: ${{ secrets.LICENSE_SERVER_URL }}
+
+      - name: Build Linux player
+        if: steps.cached-linux.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
+        with:
+          target: StandaloneLinux64
+          output-path: Build/StandaloneLinux64/SentaurSurvivors
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Build Android player
+        if: steps.cached-android.outputs.hit != 'true'
+        uses: ./.github/actions/build-player
+        with:
+          target: Android
+          output-path: Build/Android/SentaurSurvivors.apk
+          sentry-dsn: ${{ secrets.DSN }}
+          sentry-auth-token: ${{ secrets.AUTH_TOKEN }}
+          sentry-org: ${{ secrets.ORG }}
+          sentry-project: ${{ secrets.PROJECT }}
+
+      - name: Upload Linux Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-StandaloneLinux64
+          path: Build/StandaloneLinux64
+          retention-days: 90
+
+      - name: Upload Android Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentaurSurvivors-Android
+          path: Build/Android
+          retention-days: 90
+
+      - name: Cache Linux player
+        if: steps.cached-linux.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-linux.outputs.key }}
+          path: Build/StandaloneLinux64
+          save: true
+
+      - name: Cache Android player
+        if: steps.cached-android.outputs.hit != 'true'
+        uses: ./.github/actions/cache-player
+        with:
+          key: ${{ steps.fingerprint-android.outputs.key }}
+          path: Build/Android
+          save: true
+
+      - name: Save Unity Library
+        if: steps.unity-needed.outputs.result == 'true'
+        uses: ./.github/actions/cache-unity-library
+        with:
+          target: StandaloneLinux64
+          save: true
 
   run-demo:
     name: Run Demo
-    needs: [build]
+    needs: [build-windows, build-linux, build-macos]
     uses: ./.github/workflows/run-demo.yml
     secrets: inherit
     with:

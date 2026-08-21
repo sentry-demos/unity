@@ -10,7 +10,7 @@ using UnityEngine.UI;
 [Serializable]
 public class ScoreEntry
 {
-    public Guid Key;
+    public string Key;
     public string Name;
     public string Email;
     public string Duration;
@@ -101,7 +101,7 @@ public class ScorePoster : MonoBehaviour
     {
         var score = new ScoreEntry
         {
-            Key = Guid.NewGuid(),
+            Key = Guid.NewGuid().ToString(),
             Name = _nameField.text,
             Duration = TimeSpan.FromSeconds(Time.timeSinceLevelLoad).ToString(),
             Score = _gameManager.GetScore(),

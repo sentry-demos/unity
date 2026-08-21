@@ -1,0 +1,58 @@
+name: Build player
+description: Builds one Unity player target and uploads the Sentry debug symbols.
+
+inputs:
+  target:
+    description: Unity build target, e.g. StandaloneOSX, StandaloneWindows64, Android, iOS.
+    required: true
+  output-path:
+    description: Player output path, relative to the repository root.
+    required: true
+  sentry-dsn:
+    description: DSN the built player reports to.
+    required: true
+  sentry-auth-token:
+    description: Auth token used by sentry-cli to upload debug symbols.
+    required: true
+  sentry-org:
+    description: Sentry organization slug the symbols are uploaded to.
+    required: true
+  sentry-project:
+    description: Sentry project slug the symbols are uploaded to.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Build ${{ inputs.target }} player
+      shell: pwsh
+      env:
+        SENTRY_DSN: ${{ inputs.sentry-dsn }}
+        SENTRY_LOG_LEVEL: debug
+        # Deliberately NOT named SENTRY_AUTH_TOKEN. sentry-cli picks that name up from
+        # the environment and then refuses to mix it with the sentry.properties file the
+        # SDK writes for org/project, which breaks the symbol upload. Passing it under a
+        # name sentry-cli ignores lets the SDK own the whole configuration.
+        BUILD_SENTRY_AUTH_TOKEN: ${{ inputs.sentry-auth-token }}
+        BUILD_SENTRY_ORG: ${{ inputs.sentry-org }}
+        BUILD_SENTRY_PROJECT: ${{ inputs.sentry-project }}
+      run: |
+        # The credentials are read from the environment here rather than interpolated
+        # by Actions, so the token never appears in the expanded command line.
+        $buildArguments = @(
+          '-sentryAuthToken', $env:BUILD_SENTRY_AUTH_TOKEN
+          '-sentryOrg', $env:BUILD_SENTRY_ORG
+          '-sentryProject', $env:BUILD_SENTRY_PROJECT
+        ) -join ' '
+
+        unity build . `
+          --target '${{ inputs.target }}' `
+          --execute-method Editor.GameBuilder.Build `
+          --output-path '${{ inputs.output-path }}' `
+          --editor-version $env:UNITY_VERSION `
+          --args $buildArguments `
+          --non-interactive
+
+        if ($LASTEXITCODE -ne 0) {
+          throw "Building ${{ inputs.target }} failed with exit code $LASTEXITCODE."
+        }

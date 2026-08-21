@@ -13,16 +13,16 @@ namespace SceneManagers
     {
         private DemoConfiguration _demoConfig;
         private InputAction _navigateAction;
-        
+
         [SerializeField] private GameObject startButton;
         [SerializeField] private GameObject quitButton;
-        
+
         private Highlighter _startHighlighter;
         private Highlighter _quitHighlighter;
 
         private GameObject _highlightedButton;
 
-        private void Awake()
+    private void Awake()
         {
             _demoConfig = DemoConfiguration.Load();
             _navigateAction = InputSystem.actions.FindAction("Navigate");

@@ -141,7 +141,7 @@ namespace Upgrades
             
             _highlightedButton?.onClick.Invoke();
         }
-
+        
         public void SetHighlightedButton(Button button)
         {
             _option1Button.GetComponent<Highlighter>().Highlight(false);
@@ -241,7 +241,7 @@ namespace Upgrades
             const string domain = "https://aspnetcore.empower-plant.com";
             const string upgradesEndpoint = "/reviews";
             var upgradesURL = $"{domain}{upgradesEndpoint}?currentLevel={currentLevel}";
-        
+
             var client = new System.Net.Http.HttpClient(new SentryHttpMessageHandler());
             client.Timeout = TimeSpan.FromSeconds(3);
 

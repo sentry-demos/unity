@@ -34,7 +34,12 @@ public class DemoConfiguration : ScriptableObject
             return;
         _overridesApplied = true;
 
-        if (ArgumentReader.HasCommandLineFlag("demo"))
+        // iOS players don't expose the launch arguments through GetCommandLineArgs, so the
+        // simulator passes the flag as an environment variable (SIMCTL_CHILD_SENTRY_DEMO)
+        // the same way the DSN is picked up.
+        var demoFromEnvironment = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SENTRY_DEMO"));
+
+        if (ArgumentReader.HasCommandLineFlag("demo") || demoFromEnvironment)
         {
             _enabled = true;
             _autoPlay = true;

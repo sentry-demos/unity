@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,12 +22,11 @@ class ActivePickupsUI : MonoBehaviour
         }
     }
 
-    private Dictionary<int, ActivePickupState> _activePickups =
-        new Dictionary<int, ActivePickupState>();
+    private readonly Dictionary<EntityId, ActivePickupState> _activePickups = new();
 
     public void Add(Sprite icon, float duration)
     {
-        var iconInstanceId = icon.GetInstanceID();
+        var iconInstanceId = icon.GetEntityId();
         if (_activePickups.ContainsKey(iconInstanceId))
         {
             // if the pickup is already active, extend its duration
@@ -46,22 +46,15 @@ class ActivePickupsUI : MonoBehaviour
         pickupObject.transform.SetParent(transform);
 
         _activePickups.Add(
-            icon.GetInstanceID(),
+            icon.GetEntityId(),
             new ActivePickupState(pickupObject, Time.time + duration)
         );
     }
 
     private void Update()
     {
-        List<int> expiredPickupStateIds = new List<int>();
-
-        foreach (var kvp in _activePickups)
-        {
-            if (Time.time > kvp.Value.ExpirationTime)
-            {
-                expiredPickupStateIds.Add(kvp.Key);
-            }
-        }
+        var expiredPickupStateIds = (from kvp in _activePickups where Time.time > kvp.Value.ExpirationTime 
+            select kvp.Key).ToList();
 
         foreach (var expiredPickupId in expiredPickupStateIds)
         {

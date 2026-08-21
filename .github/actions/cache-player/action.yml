@@ -1,0 +1,41 @@
+name: Cache player
+description: >-
+  Restores a previously built player, or saves one after a successful build. On a
+  hit the whole Unity install/license/build sequence can be skipped. There is no
+  restore-keys fallback on purpose: a near-miss player is the wrong binary, not a
+  cheaper starting point.
+
+inputs:
+  key:
+    description: Cache key from the build-fingerprint action.
+    required: true
+  path:
+    description: Build output to cache, relative to the repository root.
+    required: true
+  save:
+    description: Set to 'true' to save the cache instead of restoring it.
+    required: false
+    default: 'false'
+
+outputs:
+  hit:
+    description: Set to the string "true" when the player was restored from cache.
+    value: ${{ steps.restore.outputs.cache-hit == 'true' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore player
+      id: restore
+      if: inputs.save != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}
+
+    - name: Save player
+      if: inputs.save == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}

@@ -1,0 +1,124 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+
+namespace Editor
+{
+    public static class GameBuilder
+    {
+        public static void Build()
+        {
+            // The Unity CLI translates its own '--target' and '--output-path' flags into the
+            // legacy '-buildTarget' and '-buildOutput' editor arguments read here. That mapping
+            // is undocumented, so if a CLI upgrade breaks the build, check these names first.
+            var arguments = Environment.GetCommandLineArgs();
+            var target = GetBuildTarget(GetArgument(arguments, "-buildTarget"));
+            var outputPath = GetArgument(arguments, "-buildOutput");
+            var outputDirectory = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(outputDirectory))
+            {
+                Directory.CreateDirectory(outputDirectory);
+            }
+
+            if (target == BuildTarget.Android)
+            {
+                PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLES3 });
+            }
+
+            if (target == BuildTarget.iOS)
+            {
+                // CI runs the demo on a simulator.
+                PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
+            }
+
+            if (target == BuildTarget.StandaloneLinux64)
+            {
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.StandaloneLinux64, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.StandaloneLinux64, new[] { UnityEngine.Rendering.GraphicsDeviceType.OpenGLCore });
+                PlayerSettings.gpuSkinning = false;
+                PlayerSettings.graphicsJobs = false;
+            }
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = GetEnabledScenes(),
+                locationPathName = outputPath,
+                target = target,
+                targetGroup = GetBuildTargetGroup(target)
+            });
+
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                throw new Exception($"Build failed with {report.summary.totalErrors} error(s).");
+            }
+
+            Debug.Log($"Build succeeded: {report.summary.outputPath} ({report.summary.totalSize} bytes)");
+        }
+
+        private static string[] GetEnabledScenes()
+        {
+            var scenes = new List<string>();
+            foreach (var scene in EditorBuildSettings.scenes)
+            {
+                if (scene.enabled)
+                {
+                    scenes.Add(scene.path);
+                }
+            }
+
+            if (scenes.Count == 0)
+            {
+                throw new Exception("No enabled scenes in Editor Build Settings.");
+            }
+
+            return scenes.ToArray();
+        }
+
+        private static string GetArgument(string[] arguments, string name)
+        {
+            for (var i = 0; i < arguments.Length - 1; i++)
+            {
+                if (string.Equals(arguments[i], name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return arguments[i + 1];
+                }
+            }
+
+            throw new ArgumentException($"Required command line argument '{name}' was not provided.");
+        }
+
+        private static BuildTarget GetBuildTarget(string target)
+        {
+            if (Enum.TryParse(target, true, out BuildTarget buildTarget))
+            {
+                return buildTarget;
+            }
+
+            throw new ArgumentException($"Unsupported build target '{target}'.");
+        }
+
+        private static BuildTargetGroup GetBuildTargetGroup(BuildTarget target)
+        {
+            switch (target)
+            {
+                case BuildTarget.StandaloneWindows64:
+                case BuildTarget.StandaloneOSX:
+                case BuildTarget.StandaloneLinux64:
+                    return BuildTargetGroup.Standalone;
+                case BuildTarget.Android:
+                    return BuildTargetGroup.Android;
+                case BuildTarget.iOS:
+                    return BuildTargetGroup.iOS;
+                case BuildTarget.WebGL:
+                    return BuildTargetGroup.WebGL;
+                default:
+                    throw new ArgumentException($"Unsupported build target '{target}'.");
+            }
+        }
+    }
+}

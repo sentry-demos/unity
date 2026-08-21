@@ -14,7 +14,7 @@ class UpgradeManager : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindFirstObjectByType<UpgradeManager>();
+                _instance = FindAnyObjectByType<UpgradeManager>();
             }
             return _instance;
         }
@@ -72,7 +72,7 @@ class UpgradeManager : MonoBehaviour
         upgradePath.LevelUp(); // level up the selected upgrade
 
         // _upgradeData[selectedUpgrade].LevelUp(); // level up the selected upgrade
-
+        
         if (upgradePath.IsMaxLevel())
         {
             // take the upgrade out of the pool if it's maxed out

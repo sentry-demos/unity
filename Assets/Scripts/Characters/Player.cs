@@ -66,7 +66,7 @@ public class Player : MonoBehaviour
         {
             if (_instance == null)
             {
-                _instance = FindFirstObjectByType<Player>();
+                _instance = FindAnyObjectByType<Player>();
             }
             return _instance;
         }

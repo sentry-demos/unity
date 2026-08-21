@@ -44,7 +44,7 @@ You have a couple choices for playing:
 
 ## Dependencies
 
-Requires Unity 2022.3.7f1.
+Requires Unity 6.3.8f1.
 
 ## Contributing
 

@@ -1,0 +1,120 @@
+name: Set up Unity
+description: >-
+  Installs the Unity CLI and Editor and points the licensing client at the floating
+  license server. The editor takes and releases a seat by itself, so there is no
+  separate acquire or return step.
+
+inputs:
+  modules:
+    description: Space-separated Unity Editor modules to install, e.g. "mac-il2cpp ios".
+    required: true
+  license-server-url:
+    description: Base URL of the Unity floating license server.
+    required: true
+
+outputs:
+  unity-version:
+    description: The Editor version read from ProjectSettings/ProjectVersion.txt.
+    value: ${{ steps.unity-version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    # ProjectVersion.txt is the single source of truth for the Editor version, so
+    # bumping Unity is a project-file change rather than a workflow change.
+    - name: Read Unity version
+      id: unity-version
+      shell: pwsh
+      run: |
+        $line = Get-Content ProjectSettings/ProjectVersion.txt |
+          Where-Object { $_ -match '^m_EditorVersion:' } |
+          Select-Object -First 1
+        if (-not $line) {
+          throw 'Could not read m_EditorVersion from ProjectSettings/ProjectVersion.txt.'
+        }
+
+        $version = $line.Split(':', 2)[1].Trim()
+        "version=$version" >> $env:GITHUB_OUTPUT
+        "UNITY_VERSION=$version" >> $env:GITHUB_ENV
+
+    # The install scripts differ per OS, but everything downstream is the same, so
+    # this is the only place the runner OS is branched on.
+    - name: Install Unity CLI
+      shell: pwsh
+      env:
+        UNITY_CLI_CHANNEL: beta
+      run: |
+        if ($IsWindows) {
+          $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
+          & ([scriptblock]::Create($installer)) -Channel beta
+          "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
+        } else {
+          curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
+          # macOS installs to ~/.unity/bin, Linux to ~/.local/bin.
+          $binDirectory = if ($IsMacOS) { "$env:HOME/.unity/bin" } else { "$env:HOME/.local/bin" }
+          $binDirectory >> $env:GITHUB_PATH
+        }
+
+    # Only checks that the CLI is on PATH and runs. The beta channel bumps often and
+    # pinning an exact version breaks the build for no benefit.
+    - name: Verify Unity CLI
+      shell: pwsh
+      run: |
+        $version = (unity --version 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
+          throw "Unity CLI is not usable: 'unity --version' exited with $LASTEXITCODE and printed '$version'."
+        }
+
+        Write-Host "Unity CLI $version"
+
+    # Installing into RUNNER_TEMP keeps the Editor out of the workspace so it is
+    # never picked up by the Library cache or the artifact uploads.
+    - name: Install Unity Editor
+      shell: pwsh
+      run: |
+        $editorPath = Join-Path $env:RUNNER_TEMP 'unity-editors'
+        New-Item -ItemType Directory -Path $editorPath -Force | Out-Null
+        "UNITY_EDITOR_PATH=$editorPath" >> $env:GITHUB_ENV
+        unity install-path --set "$editorPath" --non-interactive
+
+        $moduleArguments = '${{ inputs.modules }}'.Split(' ', [StringSplitOptions]::RemoveEmptyEntries) |
+          ForEach-Object { @('--module', $_) }
+        unity install $env:UNITY_VERSION @moduleArguments --childModules --accept-eula --yes --non-interactive
+        if ($LASTEXITCODE -ne 0) {
+          throw "Unity Editor installation failed with exit code $LASTEXITCODE."
+        }
+
+    - name: Configure Unity license server
+      shell: pwsh
+      env:
+        LICENSE_SERVER_URL: ${{ inputs.license-server-url }}
+      run: |
+        if ([string]::IsNullOrWhiteSpace($env:LICENSE_SERVER_URL)) {
+          throw 'license-server-url is required for Unity floating licenses.'
+        }
+
+        # The licensing client only reads this config from a fixed per-OS location.
+        $configDirectory = if ($IsWindows) {
+          Join-Path $env:ProgramData 'Unity/config'
+        } elseif ($IsMacOS) {
+          '/Library/Application Support/Unity/config'
+        } else {
+          '/usr/share/unity3d/config'
+        }
+
+        $config = @{
+          licensingServiceBaseUrl = $env:LICENSE_SERVER_URL
+          enableEntitlementLicensing = $true
+          enableFloatingApi = $true
+          clientConnectTimeoutSec = 5
+          clientHandshakeTimeoutSec = 10
+        } | ConvertTo-Json
+
+        $configPath = Join-Path $configDirectory 'services-config.json'
+        if ($IsWindows) {
+          New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
+          Set-Content -Path $configPath -Value $config
+        } else {
+          sudo mkdir -p $configDirectory
+          $config | sudo tee $configPath > $null
+        }
