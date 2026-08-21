@@ -1,13 +1,8 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.PlayerLoop;
 
 public class Dart : WeaponBase
 {
-    private InputAction _lookAction;
-    private InputAction _mouseAction;
-    
     [SerializeField]
     private float _speed = 10.0f;
 
@@ -30,55 +25,21 @@ public class Dart : WeaponBase
     private DartProjectile _dartProjectilePrefab;
 
     private Vector3 _shootingDirection = Vector3.right;
-    private Arrow _arrow;
+    private AutoAim _autoAim;
 
     // Override mechanism for external shooting direction control
     private bool _hasExternalShootingDirection = false;
     private Vector3 _externalShootingDirection;
 
-    private void Awake()
-    {
-        _lookAction = InputSystem.actions.FindAction("Look");
-        _mouseAction = InputSystem.actions.FindAction("Mouse");
-        
-        _arrow = Player.Instance.GetComponentInChildren<Arrow>();
-    }
-    
     public void Start()
     {
         _isEnabled = true;
         _player = Player.Instance.gameObject;
-    }
-
-    protected override void Update()
-    {
-        base.Update();
-
-        // Only calculate direction if not overridden externally
-        if (!_hasExternalShootingDirection)
-        {
-            _shootingDirection = CalculateDirection(_player);
-        }
-        else
-        {
-            _shootingDirection = _externalShootingDirection;
-        }
-        
-        // If we have a valid direction vector
-        if (_shootingDirection != Vector3.zero)
-        {
-            // Create a rotation where the arrow's right vector points in the direction
-            // This works better for 2D objects that should point in a direction
-            float angle = Mathf.Atan2(_shootingDirection.y, _shootingDirection.x) * Mathf.Rad2Deg;
-            if (_arrow != null)
-            {
-                _arrow.transform.rotation = Quaternion.Euler(0, 0, angle);    
-            }
-        }
+        _autoAim = Player.Instance.GetComponent<AutoAim>();
     }
 
     /// <summary>
-    /// Sets the shooting direction externally, overriding the normal input-based calculation
+    /// Sets the shooting direction externally, overriding <see cref="AutoAim"/>.
     /// </summary>
     /// <param name="direction">The direction to shoot in</param>
     public void SetShootingDirection(Vector3 direction)
@@ -88,11 +49,37 @@ public class Dart : WeaponBase
     }
 
     /// <summary>
-    /// Clears the external shooting direction override, returning to normal input-based calculation
+    /// Clears the external shooting direction override, returning to <see cref="AutoAim"/>.
     /// </summary>
     public void ClearShootingDirectionOverride()
     {
         _hasExternalShootingDirection = false;
+    }
+
+    /// <summary>Where to fire: the demo override if one is set, otherwise the auto-aim.</summary>
+    private Vector3 CalculateDirection()
+    {
+        if (_hasExternalShootingDirection)
+        {
+            return _externalShootingDirection;
+        }
+
+        return _autoAim != null ? _autoAim.AimDirection : _shootingDirection;
+    }
+
+    /// <summary>
+    /// Where the rear-firing darts go. The auto-aim picks a target behind the player rather
+    /// than the bare opposite of the forward shot, which lands in empty space now that the
+    /// player no longer chooses the axis themselves.
+    /// </summary>
+    private Vector3 CalculateRearDirection()
+    {
+        if (_hasExternalShootingDirection)
+        {
+            return -_externalShootingDirection;
+        }
+
+        return _autoAim != null ? _autoAim.RearAimDirection : -_shootingDirection;
     }
 
     public override void Fire()
@@ -112,14 +99,17 @@ public class Dart : WeaponBase
     public IEnumerator ShootDarts()
     {
         _isShooting = true;
-        
+
         // shoot the base number of darts
         for (int i = 0; i < Count; i++)
         {
+            // re-aim between darts, so a burst tracks a target that is still moving
+            _shootingDirection = CalculateDirection();
+
             ShootADart(_dartProjectilePrefab, _player, _shootingDirection);
             if (RearFiringDartCount > i)
             {
-                ShootADart(_dartProjectilePrefab, _player, _shootingDirection * -1);
+                ShootADart(_dartProjectilePrefab, _player, CalculateRearDirection());
             }
 
             yield return new WaitForSeconds(_shootingInterval);
@@ -127,14 +117,11 @@ public class Dart : WeaponBase
 
         // accounting for case where # of backwards darts > # of forwards darts
         int remainingDarts = RearFiringDartCount - Count;
-        if (remainingDarts > 0)
+        for (int i = 0; i < remainingDarts; i++)
         {
-            _shootingDirection *= -1;
-            for (int i = 0; i < remainingDarts; i++)
-            {
-                ShootADart(_dartProjectilePrefab, _player, _shootingDirection);
-                yield return new WaitForSeconds(_shootingInterval);
-            }
+            // re-aim between darts here too, for the same reason as the burst above
+            ShootADart(_dartProjectilePrefab, _player, CalculateRearDirection());
+            yield return new WaitForSeconds(_shootingInterval);
         }
 
         // reset cooldown after all darts have been shot
@@ -155,27 +142,5 @@ public class Dart : WeaponBase
             player.transform.position + direction.normalized * _spawnDistanceOutsidePlayer;
 
         dart.SetDirection(direction);
-    }
-
-    private Vector3 CalculateDirection(GameObject player)
-    {
-        // Use gamepad right stick if it's actively being used
-        var stickDirection = _lookAction.ReadValue<Vector2>();
-        if (stickDirection.magnitude >= 0.1f)
-        {
-            return stickDirection;
-        }
-
-        // On desktop, fall through to mouse aiming
-        if (Application.platform != RuntimePlatform.Android &&
-            Application.platform != RuntimePlatform.IPhonePlayer)
-        {
-            var mousePosition = Camera.main.ScreenToWorldPoint(_mouseAction.ReadValue<Vector2>());
-            var targetDirection = mousePosition - player.transform.position;
-            return targetDirection;
-        }
-
-        // On mobile with no stick input, keep current direction
-        return _shootingDirection;
     }
 }

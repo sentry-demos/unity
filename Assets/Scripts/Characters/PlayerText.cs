@@ -8,7 +8,7 @@ public class PlayerText : MonoBehaviour
 
     private Sequence _animSequence;
 
-    void Awake()
+    private void Awake()
     {
         _text = transform.Find("Text").GetComponent<TextMeshPro>();
     }
@@ -21,7 +21,7 @@ public class PlayerText : MonoBehaviour
     private void Init(string text)
     {
         // set the text
-        this.SetText(text);
+        SetText(text);
 
         // make the text jump up
         _animSequence = transform.DOLocalJump(

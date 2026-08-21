@@ -7,8 +7,9 @@ public class BeerbootPickup : PickupBase
 
     protected override void OnCollect(Player player)
     {
-        var currentEffectCooldownModifier = Player.Instance.WeaponManager.GlobalEffektCooldownModifier;
-        Player.Instance.WeaponManager.GlobalEffektCooldownModifier = _cooldownModifier;
+        var stats = Player.Instance.WeaponManager.Stats;
+        var currentEffectCooldownModifier = stats.EffectCooldownModifier;
+        stats.EffectCooldownModifier = _cooldownModifier;
 
         // Start coroutine on Player so it survives this pickup being destroyed
         Player.Instance.StartCoroutine(ResetEffectCooldown(currentEffectCooldownModifier));
@@ -18,7 +19,7 @@ public class BeerbootPickup : PickupBase
     {
         yield return new WaitForSeconds(_effectDuration);
 
-        Player.Instance.WeaponManager.GlobalEffektCooldownModifier = cooldownModifier;
+        Player.Instance.WeaponManager.Stats.EffectCooldownModifier = cooldownModifier;
     }
 
     protected override string GetEffectText()

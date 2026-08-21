@@ -6,7 +6,7 @@ public class DemoConfiguration : ScriptableObject
 {
     [Header("Master Switch")]
     [SerializeField] private bool _enabled;
-    
+
     [Header("Leaderboard Configuration")]
     [SerializeField] private string _apiUrl = string.Empty;
     [SerializeField] private User _user;
@@ -31,7 +31,10 @@ public class DemoConfiguration : ScriptableObject
     public void ApplyRuntimeOverrides()
     {
         if (_overridesApplied)
+        {
             return;
+        }
+
         _overridesApplied = true;
 
         // iOS players don't expose the launch arguments through GetCommandLineArgs, so the

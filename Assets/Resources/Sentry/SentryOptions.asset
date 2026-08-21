@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: SentryOptions
   m_EditorClassIdentifier: 
   <Enabled>k__BackingField: 1
-  <Dsn>k__BackingField: https://f63294372561fcf117487d0a59fee5cd@o447951.ingest.us.sentry.io/4508846594785280
+  <Dsn>k__BackingField: 
   <CaptureInEditor>k__BackingField: 1
   <EnableErrorEventThrottling>k__BackingField: 0
   <ThrottleDedupeWindow>k__BackingField: 1000
@@ -24,7 +24,7 @@ MonoBehaviour:
   <TracesSampleRate>k__BackingField: 1
   <AutoStartupTraces>k__BackingField: 1
   <AutoSceneLoadTraces>k__BackingField: 1
-  <AutoAwakeTraces>k__BackingField: 1
+  <AutoAwakeTraces>k__BackingField: 0
   <AutoSessionTracking>k__BackingField: 1
   <AutoSessionTrackingInterval>k__BackingField: 30000
   <ReleaseOverride>k__BackingField: 
@@ -37,6 +37,14 @@ MonoBehaviour:
   <MaxViewHierarchyRootObjects>k__BackingField: 100
   <MaxViewHierarchyObjectChildCount>k__BackingField: 20
   <MaxViewHierarchyDepth>k__BackingField: 10
+  <AutoFrameMetrics>k__BackingField: 1
+  <FrameMetricsIntervalSeconds>k__BackingField: 1
+  <AutoMemoryMetrics>k__BackingField: 1
+  <AutoGcMetrics>k__BackingField: 1
+  <AutoNetworkMetrics>k__BackingField: 1
+  <MemoryMetricsIntervalSeconds>k__BackingField: 60
+  <GcMetricsIntervalSeconds>k__BackingField: 60
+  <NetworkMetricsIntervalSeconds>k__BackingField: 10
   <EnableStructuredLogging>k__BackingField: 1
   <StructuredLogOnDebugLog>k__BackingField: 1
   <StructuredLogOnDebugLogWarning>k__BackingField: 1

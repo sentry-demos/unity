@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      /* The canvas keeps its authored {{{ WIDTH }}}x{{{ HEIGHT }}} render buffer and is
+         stretched to the screen by the compositor. Unity therefore never rasterises
+         full-screen pixels, and nearest-neighbour keeps the pixel art exact. */
+      #unity-canvas {
+        display: block;
+        position: absolute;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" width={{{ WIDTH }}} height={{{ HEIGHT }}} tabindex="-1"></canvas>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var buildUrl = "Build";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "{{{ COMPANY_NAME }}}",
+        productName: "{{{ PRODUCT_NAME }}}",
+        productVersion: "{{{ PRODUCT_VERSION }}}",
+      };
+
+      // Decouple the WebGL render target from the DOM size. Without this Unity
+      // resizes the buffer to match the CSS box and we are back to rendering
+      // full-screen pixels, which is the whole cost we are avoiding.
+      config.matchWebGLToCanvasSize = false;
+
+      var script = document.createElement("script");
+      script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      script.onload = () => {
+        createUnityInstance(canvas, config).catch((m) => console.error(m));
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

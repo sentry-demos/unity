@@ -2,26 +2,14 @@ using System.Collections.Generic;
 using Sentry;
 using UnityEngine;
 
-class UpgradeManager : MonoBehaviour
+internal class UpgradeManager : SceneSingleton<UpgradeManager>
 {
-    List<UpgradePathBase> _availableUpgrades = new List<UpgradePathBase>();
+    private List<UpgradePathBase> _availableUpgrades = new List<UpgradePathBase>();
 
-    private static UpgradeManager _instance;
-
-    public static UpgradeManager Instance
+    protected override void Awake()
     {
-        get
-        {
-            if (_instance == null)
-            {
-                _instance = FindAnyObjectByType<UpgradeManager>();
-            }
-            return _instance;
-        }
-    }
+        base.Awake();
 
-    public void Awake()
-    {
         _availableUpgrades.AddRange(GetComponentsInChildren<UpgradePathBase>());
 
         // dart starts at level 1
@@ -30,68 +18,50 @@ class UpgradeManager : MonoBehaviour
     }
 
     /**
-      * Returns a tuple of random upgrade paths that are valid
+      * Returns up to count distinct random upgrade paths from the available pool
       */
-    public (UpgradePathBase, UpgradePathBase) GetRandomUpgradePaths()
-    {
-        int option1 = Random.Range(0, _availableUpgrades.Count);
-        int option2;
-
-        // select a second option that is different from the first option if the number of available
-        // projectiles is greater than 1
-        do
-        {
-            option2 = Random.Range(0, _availableUpgrades.Count);
-        } while (_availableUpgrades.Count > 1 && option2 == option1);
-
-        return (_availableUpgrades[option1], _availableUpgrades[option2]);
-    }
+    public List<UpgradePathBase> GetRandomUpgradePaths(int count) =>
+        PickDistinct(_availableUpgrades, count, max => Random.Range(0, max));
 
     /**
-      * Returns a tuple of random upgrade paths that are valid
+      * Draws count distinct entries from pool without replacement, or the whole pool if it
+      * holds fewer. The source is left untouched.
+      *
+      * Static and index-source-injected so the draw can be tested with a deterministic
+      * sequence instead of UnityEngine.Random.
       */
-    public List<UpgradePathBase> GetRandomUpgradePaths(int count)
+    public static List<T> PickDistinct<T>(List<T> pool, int count, System.Func<int, int> nextIndex)
     {
-        // make a copy of upgrade paths
-        List<UpgradePathBase> availableUpgrades = new List<UpgradePathBase>(_availableUpgrades);
+        var remaining = new List<T>(pool);
+        var chosen = new List<T>();
 
-        List<UpgradePathBase> chosenUpgrades = new List<UpgradePathBase>();
-
-        while (chosenUpgrades.Count < count && availableUpgrades.Count > 0)
+        while (chosen.Count < count && remaining.Count > 0)
         {
-            int option = Random.Range(0, availableUpgrades.Count);
-            chosenUpgrades.Add(availableUpgrades[option]);
-            availableUpgrades.RemoveAt(option);
+            var option = nextIndex(remaining.Count);
+            chosen.Add(remaining[option]);
+            remaining.RemoveAt(option);
         }
 
-        return chosenUpgrades;
+        return chosen;
     }
 
     public void LevelUpUpgradePath(UpgradePathBase upgradePath)
     {
         upgradePath.LevelUp(); // level up the selected upgrade
 
-        // _upgradeData[selectedUpgrade].LevelUp(); // level up the selected upgrade
-        
+        // The type name, not the serialised Title: the title is display copy and can be
+        // re-worded, which would silently split the metric in two.
+        GameMetrics.Count(
+            GameMetrics.UpgradeSelected,
+            1,
+            (GameMetrics.PathKey, upgradePath.GetType().Name),
+            (GameMetrics.NewLevelKey, upgradePath.Level)
+        );
+
         if (upgradePath.IsMaxLevel())
         {
             // take the upgrade out of the pool if it's maxed out
-            for (int i = 0; i < _availableUpgrades.Count; i++)
-            {
-                if (_availableUpgrades[i] == upgradePath)
-                {
-                    _availableUpgrades.RemoveAt(i);
-                    break;
-                }
-            }
-        }
-    }
-
-    void OnDestroy()
-    {
-        if (_instance == this)
-        {
-            _instance = null;
+            _availableUpgrades.Remove(upgradePath);
         }
     }
 }

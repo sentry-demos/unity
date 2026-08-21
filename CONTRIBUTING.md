@@ -1,17 +1,72 @@
 # Contributing
 
+## Some bugs here are on purpose
+
+This is a demo app for Sentry, an error-monitoring SDK. Part of what it demonstrates is
+things going wrong — crashes, failed network calls, unhandled exceptions — so Sentry can
+be seen catching them. **Those faults are deliberate. Don't fix them.**
+
+Intentional faults are gated behind a flag on `DemoConfiguration`
+(`Assets/Scripts/Config/DemoConfiguration.cs`): `AutoPlay`, `NotHotDogParticleEffect`,
+`FetchUpgradeFromServer` and `CrashOnGameOver`, each ANDed with the `_enabled` master
+switch. `Assets/Resources/DemoConfig.asset` ships with every flag off; they're turned on
+by passing `-demo` on the command line or setting the `SENTRY_DEMO` environment
+variable, which is what CI's demo run does.
+
+So the rule of thumb when you find something broken:
+
+* **Reachable with the demo config off?** Real bug affecting real players — fix it.
+* **Reachable only with the demo config on?** Instrumentation — leave the behaviour
+  alone. If the intent isn't obvious from the surrounding code, add a comment saying so.
+
+Current examples of the second kind: the server-upgrade fetch in `LevelUpUI`, the
+unguarded asset-bundle download in `NotHotDockPickupEffect`, and the native crash in
+`BattleSceneManager.SaveScoreToDisk`.
+
 ## Coding Style
 
-We mostly follow standard [Google's C# style guide](https://google.github.io/styleguide/csharp-style.html), because it's the most concise guide.
+We mostly follow [Google's C# style guide](https://google.github.io/styleguide/csharp-style.html), because it's the most concise guide, with 4-space indentation instead of 2.
+
+The rules live in [`.editorconfig`](.editorconfig), so you shouldn't have to think about them: Rider, Visual Studio and VS Code all read that file and apply it on save.
 
 The key things to know:
 
 * `PascalCase` for classes, methods, public fields, etc.
 * `camelCase` for local variables and parameters
-* `_camelCase` for private and protected class properties
-* 4 space indentation (vs 2 in Google's guide)
+* `_camelCase` for private and protected fields
+* 4 space indentation
 
-Don't worry about being pedantic around whitespace rules, where braces go, method ordering, etc.
+### Formatting
+
+Don't hand-tune whitespace. To normalise the tree:
+
+```sh
+dotnet format whitespace Assets --folder --exclude Assets/Plugins
+```
+
+CI runs the same command with `--verify-no-changes` and fails the PR on drift.
+
+Two things worth knowing:
+
+* **Vendored code under `Assets/Plugins` is excluded.** DOTween and friends aren't ours to restyle — reformatting them turns every upstream upgrade into a merge conflict.
+* **`dotnet format` can't see inactive `#if` branches.** Code inside e.g. `#if UNITY_ANDROID && !UNITY_EDITOR` isn't compiled on your machine, so the formatter skips it. Tidy those by hand.
+
+### Naming
+
+Naming violations (`IDE1006`) show up as warnings in your editor but are **not** gated in CI, and `dotnet format` won't fix them for you.
+
+That's deliberate. Most of the violations still in the codebase are on Unity-serialised fields (`public int hitpoints`, `[SerializeField] private Transform arrow`, …), and **renaming a serialised field silently drops its value in every prefab and scene that uses it**. If you do rename one, do it from inside the Unity Editor and add `[FormerlySerializedAs("oldName")]` so existing assets keep their data.
+
+New code should follow the naming rules from the start.
+
+### Logging
+
+Use `Debug.Log` directly. If you want logs out of a build, turn them off in the build settings rather than wrapping them in something.
+
+Two things to know:
+
+* **Some log lines are a contract with CI.** The demo run greps the player log to decide whether a build passed, so those strings live in two places at once. They're at the top of [`.github/scripts/lib/DemoRun.psm1`](.github/scripts/lib/DemoRun.psm1): `"Start Game"` in `TitleSceneManager.StartGame` proves the build reached gameplay, `"Attempting save_score_to_disk"` in `BattleSceneManager` proves it reached the native crash. **Change one of those log lines and you change the script too**, or the demo job fails with nothing visibly wrong in the game.
+* **Logs reach Sentry.** `Assets/Resources/Sentry/SentryOptions.asset` has `StructuredLogOnDebugLog` and `BreadcrumbsForLogs` on, so each line is sent as a structured log and takes one of `MaxBreadcrumbs` (100) slots. Worth remembering before adding one to a per-frame or per-collision path, where it'll push the run-up to the crash out of the breadcrumb trail. High-frequency signal is better off in `GameMetrics.Record*`, which accumulates and drains once a second.
 
 ## Folders
 

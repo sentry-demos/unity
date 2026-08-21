@@ -19,7 +19,7 @@ namespace Characters
         protected override Vector2 DetermineDirection(GameObject player)
         {
             var distanceToTarget = Vector2.Distance(transform.position, _targetPosition);
-            
+
             if (distanceToTarget <= _stoppingDistance)
             {
                 PickNewRandomTarget();

@@ -23,7 +23,7 @@ public class RavenUpgradePath : WeaponUpgradePath
     public override void UpgradeToLevel(int level)
     {
         var raven = (Raven)_weapon;
-        switch (_level)
+        switch (level)
         {
             case 1:
                 Activate();

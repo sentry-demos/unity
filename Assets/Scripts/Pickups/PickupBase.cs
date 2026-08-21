@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public class PickupBase : MonoBehaviour
@@ -25,23 +24,28 @@ public class PickupBase : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         // if the player touches the pickup, destroy the pickup
-        if (other.gameObject.name == "Player")
+        if (other.gameObject.TryGetComponent<Player>(out var player))
         {
-            var player = other.gameObject.GetComponent<Player>();
-
             OnCollect(player);
 
             if (_pickupSound != null)
-                SoundManager.Instance.PlayPickupSound(_pickupSound);
+            {
+                SoundEffects.Instance.PlayPickupSound(_pickupSound);
+            }
 
             Player.Instance.SpawnPlayerText(GetEffectText());
 
-            // Destroy the pickup
-            Destroy(this.gameObject);
+            // Each pickup is its own component, so the type name is the pickup's name and
+            // the attribute stays bounded by the class list.
+            GameMetrics.RecordPickupCollected(GetType().Name);
 
-            // trigger an event that lets people know this was picked up
-            List<object> eventData = new List<object> { _scoreValue, gameObject, _effectDuration };
-            EventManager.TriggerEvent("PickupGrabbed", new EventData(eventData));
+            // Read the icon off this object before destroying it
+            var collected = new PickupCollected(_scoreValue, Icon, _effectDuration);
+
+            // Destroy the pickup
+            Destroy(gameObject);
+
+            GameEvents.RaisePickupGrabbed(collected);
         }
     }
 

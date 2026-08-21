@@ -1,8 +1,8 @@
-using Sentry;
-using Sentry.Unity;
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Sentry;
+using Sentry.Unity;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -24,62 +24,79 @@ public class ScorePoster : MonoBehaviour
     [SerializeField] private GameObject _root;
     [SerializeField] private TMP_InputField _nameField;
     [SerializeField] private Button _submitButton;
+    [SerializeField] private BattleSceneManager _gameManager;
 
     private DemoConfiguration _demoConfig;
-    private BattleSceneManager _gameManager;
     private TextMeshProUGUI _buttonText;
 
     private string _jwtToken;
     private HttpClient _httpClient;
 
+    // Awaited before uploading: the player can submit before login resolves.
+    private Task _loginTask;
+    private bool _isUploading;
+    private bool _uploadSucceeded;
+
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
-        _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
 
         _submitButton.onClick.AddListener(OnSubmit);
-        
     }
 
-    public void Start()
+    private void Start()
     {
         if (_demoConfig != null && _demoConfig.Enabled && !string.IsNullOrEmpty(_demoConfig.ApiUrl))
         {
             _httpClient = new HttpClient(new SentryHttpMessageHandler());
-            _ = LoginAsync();
+            _loginTask = LoginAsync();
         }
     }
 
     public void Enable()
     {
-        // If we did not manage to login during `Awake` (which means scene loading) then we do not display the upload screen
+        // Nothing to upload to if the login failed.
         if (_jwtToken != null)
         {
             _root.SetActive(true);
         }
     }
 
+    private void OnDestroy()
+    {
+        // "Try Again" reloads the scene, so this would otherwise leak per reload.
+        _httpClient?.Dispose();
+        _httpClient = null;
+    }
+
     private async Task LoginAsync()
     {
-        var transaction = SentrySdk.StartTransaction("scoreposter", "login");
-        SentrySdk.ConfigureScope(scope => scope.Transaction = transaction);
-        
+        // On the run's trace: the score being posted is the last act of the run that earned it.
+        var transaction = RunTrace.StartTransaction("scoreposter", "login");
+        RunTrace.SetScopeTransaction(transaction);
+
         try
         {
             var json = JsonUtility.ToJson(_demoConfig.User);
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-            
+
             var response = await _httpClient.PostAsync(_demoConfig.ApiUrl + "/token", content);
             if (response.IsSuccessStatusCode)
             {
                 Debug.Log("Login to leaderboard successful.");
+                GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "ok"));
                 transaction.Finish(SpanStatus.Ok);
                 _jwtToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
             }
             else
             {
                 Debug.Log("Login to leaderboard failed.");
+                GameMetrics.Count(
+                    GameMetrics.ScoreLogin,
+                    1,
+                    (GameMetrics.ResultKey, ((int)response.StatusCode).ToString())
+                );
                 transaction.Finish(SpanStatus.Unavailable);
                 _jwtToken = null;
             }
@@ -87,18 +104,73 @@ public class ScorePoster : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"Login failed: {ex.Message}");
+            GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "error"));
             transaction.Finish(SpanStatus.InternalError);
             _jwtToken = null;
+        }
+        finally
+        {
+            RunTrace.ClearScopeTransaction();
         }
     }
 
     private void OnSubmit()
     {
-        _ = UploadScoreAsync();
+        // Button callbacks are synchronous, so fire-and-forget via SubmitAsync, which
+        // reports anything that escapes rather than failing silently.
+        _ = SubmitAsync();
+    }
+
+    private async Task SubmitAsync()
+    {
+        try
+        {
+            await UploadScoreAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Score submission failed: {ex.Message}");
+            SentrySdk.CaptureException(ex);
+        }
     }
 
     private async Task UploadScoreAsync()
     {
+        if (_isUploading)
+        {
+            return;
+        }
+
+        _isUploading = true;
+        _submitButton.interactable = false;
+
+        try
+        {
+            _uploadSucceeded = await UploadScoreCoreAsync();
+        }
+        finally
+        {
+            _isUploading = false;
+
+            _submitButton.interactable = !_uploadSucceeded;
+        }
+    }
+
+    private async Task<bool> UploadScoreCoreAsync()
+    {
+        if (_loginTask != null)
+        {
+            await _loginTask;
+        }
+
+        if (string.IsNullOrEmpty(_jwtToken))
+        {
+            Debug.Log("Not uploading the score: no leaderboard session.");
+            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, "no_session"));
+            _buttonText.text = "Retry";
+            return false;
+        }
+
         var score = new ScoreEntry
         {
             Key = Guid.NewGuid().ToString(),
@@ -112,34 +184,59 @@ public class ScorePoster : MonoBehaviour
         var json = JsonUtility.ToJson(score);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-        var uploadTransaction = SentrySdk.StartTransaction("scoreposter", "upload");
-        SentrySdk.ConfigureScope(scope => scope.Transaction = uploadTransaction);
+        var uploadTransaction = RunTrace.StartTransaction("scoreposter", "upload");
+        RunTrace.SetScopeTransaction(uploadTransaction);
+
+        // Inside the transaction, so a spike in the failure count leads straight to a trace.
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var result = "error";
 
         try
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
-            var response = await _httpClient.PostAsync(_demoConfig.ApiUrl + "/score", content);
+            // Per-request: the client is shared, so mutating its defaults is global state.
+            using var request = new HttpRequestMessage(HttpMethod.Post, _demoConfig.ApiUrl + "/score")
+            {
+                Content = content,
+            };
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
+
+            var response = await _httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
             {
                 Debug.Log("Uploading score to leaderboard failed.");
                 SentrySdk.CaptureException(new HttpRequestException("Failed to upload score."));
+                result = ((int)response.StatusCode).ToString();
                 _buttonText.text = "Retry";
                 uploadTransaction.Finish(SpanStatus.Unavailable);
+                return false;
             }
-            else
-            {
-                Debug.Log("Uploading score to leaderboard was successful.");
-                _submitButton.interactable = false;
-                _buttonText.text = "Posted!";
-                uploadTransaction.Finish(SpanStatus.Ok);
-            }
+
+            Debug.Log("Uploading score to leaderboard was successful.");
+            result = "ok";
+            _buttonText.text = "Posted!";
+            uploadTransaction.Finish(SpanStatus.Ok);
+            return true;
         }
         catch (Exception ex)
         {
             Debug.LogError($"Score upload failed: {ex.Message}");
             _buttonText.text = "Retry";
             uploadTransaction.Finish(SpanStatus.InternalError);
+            return false;
+        }
+        finally
+        {
+            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, result));
+            GameMetrics.Distribution(
+                GameMetrics.ScoreUploadDuration,
+                started.Elapsed.TotalMilliseconds,
+                MeasurementUnit.Duration.Millisecond,
+                (GameMetrics.ResultKey, result)
+            );
+
+            RunTrace.ClearScopeTransaction();
         }
     }
 }

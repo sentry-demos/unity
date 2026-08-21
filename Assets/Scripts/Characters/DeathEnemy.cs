@@ -17,7 +17,7 @@ public class DeathEnemy : Enemy
         base.OnCollisionEnter2D(collision);
 
         // ignores everything but player
-        if (collision.gameObject.name != "Barrier")
+        if (!collision.gameObject.CompareTag(Tags.Barrier))
         {
             Physics2D.IgnoreCollision(collision.collider, GetComponent<Collider2D>());
         }

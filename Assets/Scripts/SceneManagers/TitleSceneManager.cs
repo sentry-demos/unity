@@ -22,7 +22,7 @@ namespace SceneManagers
 
         private GameObject _highlightedButton;
 
-    private void Awake()
+        private void Awake()
         {
             _demoConfig = DemoConfiguration.Load();
             _navigateAction = InputSystem.actions.FindAction("Navigate");
@@ -41,9 +41,9 @@ namespace SceneManagers
         private IEnumerator AutoStartGame()
         {
             yield return new WaitForSecondsRealtime(Random.value);
-            
+
             SetHighlightedButton(_startHighlighter);
-            
+
             yield return new WaitForSecondsRealtime(Random.value);
 
             StartGame();
@@ -55,7 +55,7 @@ namespace SceneManagers
             {
                 return;
             }
-            
+
             var direction = _navigateAction.ReadValue<Vector2>();
             if (direction.x < 0)
             {
@@ -73,13 +73,15 @@ namespace SceneManagers
         {
             _startHighlighter.Highlight(false);
             _quitHighlighter.Highlight(false);
-        
+
             highlighted.Highlight();
             _highlightedButton = highlighted.gameObject;
         }
-        
+
         public void StartGame()
         {
+            // CI's demo run proves the build reached gameplay from this line.
+            // Mirrored in .github/scripts/lib/DemoRun.psm1.
             Debug.Log("Start Game");
             SceneManager.LoadScene("BattleScene", LoadSceneMode.Single);
         }
@@ -89,7 +91,7 @@ namespace SceneManagers
             Debug.Log("Quit (Note this won't quit in the editor)");
             Application.Quit();
         }
-        
+
         private void UnityOfBugs()
         {
             Debug.Log("Loading UnityOfBugs");

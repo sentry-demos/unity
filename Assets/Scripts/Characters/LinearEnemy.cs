@@ -3,11 +3,11 @@ using UnityEngine;
 
 public class LinearEnemy : Enemy
 {
-    Vector2 _direction;
+    private Vector2 _direction;
 
-    float _timeAtSpawn;
+    private float _timeAtSpawn;
 
-    Vector3 _targetScale;
+    private Vector3 _targetScale;
 
     public enum Direction
     {

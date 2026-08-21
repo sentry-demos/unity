@@ -47,29 +47,61 @@ public class Enemy : MonoBehaviour
     private Coroutine _flashCoroutine;
 
     private SpriteRenderer _spriteRenderer;
-    private GameObject _player;
+
+    // Injected by BattleSceneManager at spawn time; enemies are instantiated from prefabs,
+    // so this cannot come from the inspector.
+    private Transform _xpDropParent;
 
     protected Rigidbody2D _rigidbody2D;
 
     private bool _isDead = false;
-    protected bool IsDead => _isDead;
+
+    /// <summary>
+    /// Which prefab this enemy came from, as a metric attribute.
+    /// </summary>
+    /// <remarks>
+    /// Read from the object name rather than the C# type: the sentaur, the ant and the
+    /// mantis all use this component unmodified, so <c>GetType()</c> cannot tell them apart.
+    /// The prefab set is small and fixed, which is what keeps the attribute bounded.
+    /// </remarks>
+    public string Kind { get; private set; }
+
+    /// <summary>
+    /// Whether this enemy is dying or dead. Set the moment it is killed, which is up to
+    /// <c>_deathAnimDuration</c> before the object is destroyed -- targeting has to skip it
+    /// for that whole window, or shots chase a corpse that is shrinking out of existence.
+    /// </summary>
+    public bool IsDead => _isDead;
+
+    /// <summary>Sets the transform that this enemy's XP drop is parented to on death.</summary>
+    public void SetXpDropParent(Transform xpDropParent)
+    {
+        _xpDropParent = xpDropParent;
+    }
 
     protected virtual void Awake()
     {
+        Kind = GameMetrics.PrefabKind(name);
+
         _spriteRenderer = GetComponent<SpriteRenderer>();
-        _player = GameObject.Find("Player");
         _rigidbody2D = GetComponent<Rigidbody2D>();
 
-        _originalMaterial = _spriteRenderer.material;
+        // sharedMaterial, not material: reading .material clones a per-renderer copy,
+        // which gives every enemy a unique material and breaks batching.
+        _originalMaterial = _spriteRenderer.sharedMaterial;
     }
 
     // Update is called once per frame
     protected virtual void Update()
     {
+        // Read per frame rather than caching in Awake: an enemy that spawned before the
+        // player resolved used to keep a null reference forever and never move.
+        var player = Player.Instance;
+
         // move towards the player character
-        if (_player != null)
+        if (player != null)
         {
-            var direction = DetermineDirection(_player);
+            var direction = DetermineDirection(player.gameObject);
             _rigidbody2D.linearVelocity = direction * _speed;
 
             // flip sprite in x direction if moving left
@@ -80,18 +112,17 @@ public class Enemy : MonoBehaviour
     /**
      * Returns a normalized vector in the direction of the desired movement
      */
-    virtual protected Vector2 DetermineDirection(GameObject player)
+    protected virtual Vector2 DetermineDirection(GameObject player)
     {
         return Vector3.Normalize(player.transform.position - transform.position);
     }
 
     // a collision handler that is called when the enemy collides with another object
-    virtual protected void OnCollisionEnter2D(UnityEngine.Collision2D collision)
+    protected virtual void OnCollisionEnter2D(UnityEngine.Collision2D collision)
     {
         // if the enemy collides with the player, destroy the player
-        if (collision.gameObject.name == "Player")
+        if (collision.gameObject.TryGetComponent<Player>(out var player))
         {
-            var player = collision.gameObject.GetComponent<Player>();
             DamagePlayer(player);
 
             // Destroy the enemy (for now they explode if they touch the player)
@@ -111,9 +142,9 @@ public class Enemy : MonoBehaviour
 
     private IEnumerator FlashCoroutine()
     {
-        _spriteRenderer.material = _flashMaterial;
+        _spriteRenderer.sharedMaterial = _flashMaterial;
         yield return new WaitForSeconds(_flashDuration);
-        _spriteRenderer.material = _originalMaterial;
+        _spriteRenderer.sharedMaterial = _originalMaterial;
     }
 
     public void Knockback(Vector2 direction, float force)
@@ -136,12 +167,11 @@ public class Enemy : MonoBehaviour
                 if (leaveXp)
                 {
                     // instantiate an xp drop at the captured death position
-                    var xpDropParent = GameObject.Find("Level").transform.Find("XpDrops");
                     var xpDrop = Instantiate(
                         _xpDropPrefab,
                         deathPosition,
                         Quaternion.identity,
-                        xpDropParent
+                        _xpDropParent
                     );
                     xpDrop.SetXp(_xpValue);
                 }
@@ -169,7 +199,16 @@ public class Enemy : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        // Death() disables the hitboxes, but that is collider timing, not a guarantee.
+        if (_isDead)
+        {
+            return;
+        }
+
         Flash();
+
+        // Recorded rather than emitted: a swarm takes hundreds of hits a second between them.
+        GameMetrics.RecordDamageDealt(damage);
 
         hitpoints -= damage;
         hitpoints = Mathf.Max(hitpoints, 0); // don't let the enemy have negative hit points
@@ -178,11 +217,12 @@ public class Enemy : MonoBehaviour
         var damageTextPosition = new Vector2(transform.position.x, transform.position.y + 1.0f);
         _damageTextPrefab.Spawn(transform.root, damageTextPosition, damage);
 
-        if (hitpoints == 0)
+        if (hitpoints <= 0)
         {
             Death(leaveXp: true);
 
-            EventManager.TriggerEvent("EnemyDestroyed", new EventData(_scoreValue));
+            GameMetrics.RecordEnemyKilled(Kind);
+            GameEvents.RaiseEnemyDestroyed(_scoreValue);
         }
     }
 }
