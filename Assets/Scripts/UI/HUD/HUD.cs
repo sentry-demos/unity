@@ -25,7 +25,7 @@ public class HUD : MonoBehaviour
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
-        
+
         // get score text component from child
         _scoreText = transform.Find("Score").GetComponent<TextMeshProUGUI>();
         _timeElapsedText = transform.Find("TimeElapsed").GetComponent<TextMeshProUGUI>();
@@ -35,16 +35,10 @@ public class HUD : MonoBehaviour
         _xpBar = transform.Find("XpBar").GetComponent<XpBar>();
 
         var tryAgainButton = _tryAgain.GetComponent<Button>();
-        tryAgainButton.onClick.AddListener(() =>
-        {
-            EventManager.TriggerEvent("TryAgain");
-        });
+        tryAgainButton.onClick.AddListener(GameEvents.RaiseTryAgain);
 
         var quitButton = _quit.GetComponent<Button>();
-        quitButton.onClick.AddListener(() =>
-        {
-            EventManager.TriggerEvent("Quit");
-        });
+        quitButton.onClick.AddListener(GameEvents.RaiseQuit);
     }
 
     private void Update()
@@ -80,7 +74,7 @@ public class HUD : MonoBehaviour
         _gameOverText.enabled = false;
         _tryAgain.SetActive(false);
         _quit.SetActive(false);
-        
+
         // Clear the highlighted button to prevent accidental clicks
         if (_hudManager != null)
         {
@@ -92,7 +86,7 @@ public class HUD : MonoBehaviour
     {
         _gameOverText.text = "GAME OVER";
         _gameOverText.enabled = true;
-        
+
         _quit.SetActive(true);
         _tryAgain.SetActive(true);
         _scorePoster.Enable();

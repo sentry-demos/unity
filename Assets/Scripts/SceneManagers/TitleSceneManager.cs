@@ -22,7 +22,7 @@ namespace SceneManagers
 
         private GameObject _highlightedButton;
 
-    private void Awake()
+        private void Awake()
         {
             _demoConfig = DemoConfiguration.Load();
             _navigateAction = InputSystem.actions.FindAction("Navigate");
@@ -41,9 +41,9 @@ namespace SceneManagers
         private IEnumerator AutoStartGame()
         {
             yield return new WaitForSecondsRealtime(Random.value);
-            
+
             SetHighlightedButton(_startHighlighter);
-            
+
             yield return new WaitForSecondsRealtime(Random.value);
 
             StartGame();
@@ -55,7 +55,7 @@ namespace SceneManagers
             {
                 return;
             }
-            
+
             var direction = _navigateAction.ReadValue<Vector2>();
             if (direction.x < 0)
             {
@@ -73,26 +73,26 @@ namespace SceneManagers
         {
             _startHighlighter.Highlight(false);
             _quitHighlighter.Highlight(false);
-        
+
             highlighted.Highlight();
             _highlightedButton = highlighted.gameObject;
         }
-        
+
         public void StartGame()
         {
-            Debug.Log("Start Game");
+            GameLog.Trace("Start Game");
             SceneManager.LoadScene("BattleScene", LoadSceneMode.Single);
         }
 
         public void QuitGame()
         {
-            Debug.Log("Quit (Note this won't quit in the editor)");
+            GameLog.Trace("Quit (Note this won't quit in the editor)");
             Application.Quit();
         }
-        
+
         private void UnityOfBugs()
         {
-            Debug.Log("Loading UnityOfBugs");
+            GameLog.Trace("Loading UnityOfBugs");
             SceneManager.LoadScene("1_Bugfarm", LoadSceneMode.Single);
         }
     }

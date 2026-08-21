@@ -22,7 +22,7 @@ public class StarfishProjectile : ProjectileBase
         _degrees = degrees;
     }
 
-    void Start()
+    private void Start()
     {
         _player = Player.Instance.gameObject;
 
@@ -34,7 +34,7 @@ public class StarfishProjectile : ProjectileBase
     }
 
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
         _timeElapsedSinceActivated += Time.deltaTime;
         if (_timeElapsedSinceActivated > _duration)
@@ -43,7 +43,7 @@ public class StarfishProjectile : ProjectileBase
         }
     }
 
-    void LateUpdate()
+    private void LateUpdate()
     {
         transform.RotateAround(
             _player.transform.position,
@@ -55,22 +55,22 @@ public class StarfishProjectile : ProjectileBase
     protected override void OnTriggerEnter2D(Collider2D other)
     {
         // if the starfish collides with an enemy, damage the enemy
-        if (other.gameObject.tag == "Enemy")
+        if (other.gameObject.CompareTag(Tags.Enemy))
         {
             var enemy = other.gameObject.GetComponent<Enemy>();
 
-            SoundManager.Instance.PlayHitSound();
+            SoundEffects.Instance.PlayHitSound();
 
             DamageEnemy(enemy);
         }
-        else if (other.gameObject.tag == "Barrier")
+        else if (other.gameObject.CompareTag(Tags.Barrier))
         {
             Physics2D.IgnoreCollision(gameObject.GetComponent<Collider2D>(), other);
         }
     }
 
     // Deal damage to the enemy because they were hit by a dart
-    override protected void DamageEnemy(Enemy enemy)
+    protected override void DamageEnemy(Enemy enemy)
     {
         enemy.TakeDamage(_damage);
     }

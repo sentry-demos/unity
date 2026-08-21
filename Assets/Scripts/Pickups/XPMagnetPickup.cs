@@ -12,7 +12,7 @@ public class XPMagnetPickup : PickupBase
     private IEnumerator SetAllXpDropsToMoving()
     {
         // get all xp drops and set moving = true
-        var xpDrops = GameObject.FindGameObjectsWithTag("XpDrop");
+        var xpDrops = GameObject.FindGameObjectsWithTag(Tags.XpDrop);
         foreach (var xpDrop in xpDrops)
         {
             xpDrop.GetComponent<XpDrop>().SetMoving();

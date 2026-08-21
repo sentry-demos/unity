@@ -9,7 +9,7 @@ public class LevelOptionUI : MonoBehaviour
     private TextMeshProUGUI _stats;
     private Image _icon;
 
-    void Awake()
+    private void Awake()
     {
         _title = transform.Find("Title").GetComponent<TextMeshProUGUI>();
         _description = transform.Find("Description").GetComponent<TextMeshProUGUI>();

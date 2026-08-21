@@ -14,12 +14,12 @@ public class DLCTitle : MonoBehaviour
 
     private float originalY; // Store the original Y position of the GameObject
 
-    void Start()
+    private void Start()
     {
         originalY = transform.position.y; // Store the original Y position
     }
 
-    void Update()
+    private void Update()
     {
         // Calculate the new Y position based on the original position and a sine wave
         float newY = originalY + (Mathf.Sin(Time.time * floatSpeed) * floatStrength);

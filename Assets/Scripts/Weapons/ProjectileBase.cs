@@ -3,26 +3,35 @@ using UnityEngine;
 
 public class ProjectileBase : MonoBehaviour
 {
+    // Reused across every projectile: the non-allocating CalculateFrustumPlanes overload
+    // needs a six-element buffer, and the results are consumed before the next call.
+    private static readonly Plane[] _frustumPlanes = new Plane[6];
+
+    // Camera.main is a tagged search on every call. Projectiles leave the screen constantly,
+    // so it is resolved once and re-resolved only if the camera goes away.
+    private static Camera _gameCamera;
+
     protected Rigidbody2D _rigidbody2D;
+    private Renderer _renderer;
 
     protected void Awake()
     {
         _rigidbody2D = GetComponent<Rigidbody2D>();
+        _renderer = GetComponentInChildren<Renderer>();
     }
 
     protected virtual void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.gameObject.name == "Hitbox")
+        if (other.gameObject.TryGetComponent<Hitbox>(out var hitbox))
         {
-            var hitbox = other.gameObject.GetComponent<Hitbox>();
             var enemy = hitbox.Enemy;
 
-            SoundManager.Instance.PlayHitSound();
+            SoundEffects.Instance.PlayHitSound();
 
             OnDamage(enemy);
             OnHit();
         }
-        else if (other.gameObject.tag == "Barrier")
+        else if (other.gameObject.CompareTag(Tags.Barrier))
         {
             OnHit();
         }
@@ -35,15 +44,46 @@ public class ProjectileBase : MonoBehaviour
 
     protected virtual void OnHit()
     {
-        Destroy(this.gameObject);
+        Destroy(gameObject);
     }
 
     // Deal damage to the enemy because they were hit by a projectile
-    virtual protected void DamageEnemy(Enemy enemy) { }
+    protected virtual void DamageEnemy(Enemy enemy) { }
 
-    void OnBecameInvisible()
+    // Fires for any camera, including the editor's Scene view, so check the game camera.
+    private void OnBecameInvisible()
     {
-        Destroy(gameObject);
+        if (!IsVisibleFromGameCamera())
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private bool IsVisibleFromGameCamera()
+    {
+        if (_gameCamera == null)
+        {
+            _gameCamera = Camera.main;
+        }
+
+        if (_gameCamera == null)
+        {
+            return false; // Scene teardown: treat as off-screen so it still gets cleaned up.
+        }
+
+        if (_renderer == null)
+        {
+            // Resolved in Awake, but a subclass that declares its own Awake would hide the
+            // base one and leave this unset -- so fall back rather than leak the projectile.
+            _renderer = GetComponentInChildren<Renderer>();
+            if (_renderer == null)
+            {
+                return false;
+            }
+        }
+
+        GeometryUtility.CalculateFrustumPlanes(_gameCamera, _frustumPlanes);
+        return GeometryUtility.TestPlanesAABB(_frustumPlanes, _renderer.bounds);
     }
 
     protected void SplashDamage(
@@ -56,7 +96,7 @@ public class ProjectileBase : MonoBehaviour
         RaycastHit2D[] hits = Physics2D.CircleCastAll(origin, radius, Vector2.zero);
         foreach (RaycastHit2D hit in hits)
         {
-            if (hit.collider != null && hit.collider.gameObject.CompareTag("Enemy"))
+            if (hit.collider != null && hit.collider.gameObject.CompareTag(Tags.Enemy))
             {
                 Enemy enemyTarget = hit.collider.gameObject.GetComponent<Enemy>();
                 if (ignoreList == null || !ignoreList.Contains(enemyTarget))

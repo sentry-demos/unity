@@ -18,16 +18,16 @@ namespace Upgrades
     {
         private InputAction _navigateAction;
         private InputAction _submitAction;
-        
+
         // fyi: title -> upgrade name, description -> level, stats -> description
         // leveling up an upgrade, changes the stats to new level, increases the level #
 
         [SerializeField] private LevelOptionUI _levelOption1;
         [SerializeField] private LevelOptionUI _levelOption2;
+        [SerializeField] private BattleSceneManager _gameManager;
 
         private DemoConfiguration _demoConfig;
-        private BattleSceneManager _gameManager;
-        
+
         private Button _option1Button;
         private Button _option2Button;
         private Button _highlightedButton;
@@ -35,11 +35,10 @@ namespace Upgrades
         private void Awake()
         {
             _demoConfig = DemoConfiguration.Load();
-            _gameManager = GameObject.Find("BattleSceneManager").GetComponent<BattleSceneManager>();
-            
+
             _navigateAction = InputSystem.actions.FindAction("Navigate");
             _submitAction = InputSystem.actions.FindAction("Submit");
-            
+
             _option1Button = _levelOption1.GetComponent<Button>();
             _option2Button = _levelOption2.GetComponent<Button>();
         }
@@ -48,11 +47,11 @@ namespace Upgrades
         {
             InputSystem.actions.FindActionMap("Player").Disable();
             InputSystem.actions.FindActionMap("UI").Enable();
-            
+
             // Subscribe to input events
             _navigateAction.performed += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
-            
+
             // Pause the game
             Time.timeScale = 0;
 
@@ -71,15 +70,15 @@ namespace Upgrades
                 return;
             }
 
-            
+
             var upgradeChoice1 = paths[0];
             var upgradeChoice2 = paths.Count > 1 ? paths[1] : paths[0]; // In case there is only one upgrade left
-            
+
             SetLevelOptionUI(upgradeChoice1, upgradeChoice2);
 
             _option1Button.onClick.AddListener(() => SelectUpgrade(upgradeChoice1));
             _option2Button.onClick.AddListener(() => SelectUpgrade(upgradeChoice2));
-            
+
             // Set initial highlighted button to option 1
             SetHighlightedButton(_option1Button);
 
@@ -92,35 +91,35 @@ namespace Upgrades
         private IEnumerator SelectSomething()
         {
             var delay = Random.value;
-            Debug.Log($"Starting to select in {delay} seconds");
+            GameLog.Trace($"Starting to select in {delay} seconds");
             yield return new WaitForSecondsRealtime(delay);
 
-            Debug.Log("Done waiting");
-            
+            GameLog.Trace("Done waiting");
+
             if (Random.value > 0.5f)
             {
-                Debug.Log("Selected left");
+                GameLog.Trace("Selected left");
                 SetHighlightedButton(_option1Button);
             }
             else
             {
-                Debug.Log("Selected right");
+                GameLog.Trace("Selected right");
                 SetHighlightedButton(_option2Button);
             }
 
             yield return new WaitForSecondsRealtime(Random.value);
-            
-            Debug.Log("Clicking the highlighted button");
+
+            GameLog.Trace("Clicking the highlighted button");
             _highlightedButton?.GetComponent<Button>().onClick.Invoke();
         }
-        
+
         private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
             if (!gameObject.activeSelf)
             {
                 return;
             }
-            
+
             var direction = context.ReadValue<Vector2>();
             if (direction.x < 0)
             {
@@ -131,22 +130,22 @@ namespace Upgrades
                 SetHighlightedButton(_option2Button);
             }
         }
-        
+
         private void OnSubmitPerformed(InputAction.CallbackContext context)
         {
             if (!gameObject.activeSelf)
             {
                 return;
             }
-            
+
             _highlightedButton?.onClick.Invoke();
         }
-        
+
         public void SetHighlightedButton(Button button)
         {
             _option1Button.GetComponent<Highlighter>().Highlight(false);
             _option2Button.GetComponent<Highlighter>().Highlight(false);
-        
+
             button.GetComponent<Highlighter>().Highlight();
             _highlightedButton = button;
         }
@@ -156,7 +155,7 @@ namespace Upgrades
             // Unsubscribe from input events
             _navigateAction.performed -= OnNavigatePerformed;
             _submitAction.performed -= OnSubmitPerformed;
-            
+
             _option1Button.onClick.RemoveAllListeners();
             _option2Button.onClick.RemoveAllListeners();
         }
@@ -190,31 +189,38 @@ namespace Upgrades
         {
             InputSystem.actions.FindActionMap("Player").Enable();
             InputSystem.actions.FindActionMap("UI").Disable();
-            
+
             UpgradeManager.Instance.LevelUpUpgradePath(selectedUpgrade);
 
             // Resume the game and exit the level up popup
             Time.timeScale = 1;
             gameObject.SetActive(false);
         }
-        
+
+        // INTENTIONAL: the parsing is deliberately incomplete, to generate HTTP traffic
+        // and failures for Sentry. Gated on DemoConfiguration.FetchUpgradeFromServer.
+        // See CONTRIBUTING.md.
+        //
+        // Caveat: on failure this returns null and the caller's `??=` falls back to local
+        // upgrades, but on success it returns an empty list, which skips the fallback and
+        // costs the player that upgrade. Fix the caller, not the parsing.
         private List<UpgradePathBase> GetUpgrades()
         {
             var fetchTransaction = SentrySdk.StartTransaction("fetch_upgrades", "http.client");
             SentrySdk.ConfigureScope(scope => scope.Transaction = fetchTransaction);
-            
+
             try
             {
                 var responseContent = FetchUpgradeDataFromServer(fetchTransaction);
                 var upgrades = ParseUpgradeData(responseContent, fetchTransaction);
-                
+
                 if (upgrades == null)
                 {
                     Debug.LogWarning("Upgrade parsing failed, falling back to local upgrades");
                     fetchTransaction.Finish(SpanStatus.Ok);
                     return null;
                 }
-                
+
                 fetchTransaction.Finish(SpanStatus.Ok);
                 return upgrades;
             }
@@ -223,21 +229,21 @@ namespace Upgrades
                 Debug.LogError($"Error fetching upgrades from server: {ex.Message}");
                 SentrySdk.CaptureException(ex);
                 fetchTransaction.Finish(SpanStatus.InternalError);
-                
+
                 return null;
             }
         }
-        
+
         private string FetchUpgradeDataFromServer(ITransactionTracer transaction)
         {
             var processDataSpan = transaction.StartChild("task", "process_level_data");
-            
+
             var currentLevel = _gameManager.GetCurrentLevel();
-            
+
             System.Threading.Tasks.Task.Delay((int)(Random.value * 100)).Wait(); // Simulate some work to be done
-        
+
             processDataSpan.Finish();
-        
+
             const string domain = "https://aspnetcore.empower-plant.com";
             const string upgradesEndpoint = "/reviews";
             var upgradesURL = $"{domain}{upgradesEndpoint}?currentLevel={currentLevel}";
@@ -252,10 +258,10 @@ namespace Upgrades
                 {
                     throw new Exception($"Server returned error status: {response.StatusCode}");
                 }
-                
+
                 Debug.Log("Successfully fetched upgrade data from server");
                 var responseContent = response.Content.ReadAsStringAsync().Result;
-                
+
                 return responseContent;
             }
             finally
@@ -263,7 +269,7 @@ namespace Upgrades
                 client.Dispose();
             }
         }
-        
+
         private List<UpgradePathBase> ParseUpgradeData(string responseContent, ITransactionTracer transaction)
         {
             var parseSpan = transaction.StartChild("task", "parse_upgrade_data");
@@ -292,13 +298,13 @@ namespace Upgrades
                 return null;
             }
         }
-        
+
         [Serializable]
         public class ServerUpgradeResponse
         {
             public ServerUpgrade[] upgrades;
         }
-        
+
         [Serializable]
         public class ServerUpgrade
         {

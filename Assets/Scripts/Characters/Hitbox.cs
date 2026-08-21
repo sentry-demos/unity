@@ -8,7 +8,7 @@ public class Hitbox : MonoBehaviour
 
     public Enemy Enemy => _parentEnemy;
 
-    void Awake()
+    private void Awake()
     {
         _parentEnemy = transform.parent.GetComponent<Enemy>();
     }

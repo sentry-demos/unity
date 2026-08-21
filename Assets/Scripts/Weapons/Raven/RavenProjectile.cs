@@ -35,7 +35,7 @@ public class RavenProjectile : ProjectileBase
     }
 
     // Deal damage to the enemy because they were hit by the raven
-    override protected void DamageEnemy(Enemy initialEnemy)
+    protected override void DamageEnemy(Enemy initialEnemy)
     {
         SplashDamage(initialEnemy.transform.position, _areaOfEffectRadius, _damage);
     }

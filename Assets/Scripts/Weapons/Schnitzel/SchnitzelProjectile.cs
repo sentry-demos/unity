@@ -59,7 +59,7 @@ public class SchnitzelProjectile : ProjectileBase
     }
 
     // Deal damage to the enemy because they were hit by a dart
-    override protected void DamageEnemy(Enemy initialEnemy)
+    protected override void DamageEnemy(Enemy initialEnemy)
     {
         initialEnemy.TakeDamage(_damage);
 

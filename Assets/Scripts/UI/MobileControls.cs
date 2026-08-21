@@ -11,11 +11,11 @@ namespace UI
             {
                 return;
             }
-            
-            if (Application.platform != RuntimePlatform.Android && 
+
+            if (Application.platform != RuntimePlatform.Android &&
                 Application.platform != RuntimePlatform.IPhonePlayer)
             {
-                gameObject.SetActive(false);    
+                gameObject.SetActive(false);
             }
         }
     }

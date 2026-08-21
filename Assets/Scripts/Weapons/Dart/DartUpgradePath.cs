@@ -21,7 +21,7 @@ public class DartUpgradePath : WeaponUpgradePath
     public override void UpgradeToLevel(int level)
     {
         var dart = (Dart)_weapon;
-        switch (_level)
+        switch (level)
         {
             case 1:
                 Activate();

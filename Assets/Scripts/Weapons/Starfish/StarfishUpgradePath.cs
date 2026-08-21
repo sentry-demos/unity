@@ -1,6 +1,6 @@
 using UnityEngine;
 
-class StarfishUpgradePath : WeaponUpgradePath
+internal class StarfishUpgradePath : WeaponUpgradePath
 {
     [SerializeField]
     private string[] _description = new string[]
@@ -21,7 +21,7 @@ class StarfishUpgradePath : WeaponUpgradePath
     public override void UpgradeToLevel(int level)
     {
         var starfish = (Starfish)_weapon;
-        switch (_level)
+        switch (level)
         {
             case 1:
                 Activate();

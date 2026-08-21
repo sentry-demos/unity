@@ -16,7 +16,8 @@ A Sentry-themed Vampire Survivors clone written for Unity in C# featuring:
 
 You have a couple choices for playing:
 
-* [Download binaries for macOS](https://github.com/getsentry/sentaur-survivors/releases/latest)
+* [Download the latest release](https://github.com/getsentry/sentaur-survivors/releases/latest) — macOS builds are published there.
+* Every CI run also uploads players for macOS, iOS, Windows, Linux and Android as build artifacts.
 
 ### How to play
 
@@ -44,7 +45,9 @@ You have a couple choices for playing:
 
 ## Dependencies
 
-Requires Unity 6.3.8f1.
+Requires the Unity Editor version pinned in [`ProjectSettings/ProjectVersion.txt`](ProjectSettings/ProjectVersion.txt).
+
+That file is the single source of truth — CI reads the same value to pick which Editor to install, so opening the project in Unity Hub gets you the right version automatically.
 
 ## Contributing
 

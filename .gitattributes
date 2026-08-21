@@ -1,0 +1,122 @@
+# Keep the repository LF-only; Git handles the working copy.
+* text=auto eol=lf
+
+# Windows-only tooling that must keep CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Unity YAML assets. A textual merge of a scene or prefab produces a file that opens
+# but is subtly wrong, so route them to Unity's SmartMerge. To enable it locally:
+#
+#   [merge "unityyamlmerge"]
+#       name = Unity SmartMerge
+#       driver = '<Unity>/Contents/Tools/UnityYAMLMerge' merge -p %O %B %A %A
+#       recursive = binary
+#
+# Without that config Git refuses the merge, which is the safe outcome.
+*.unity           text merge=unityyamlmerge eol=lf
+*.prefab          text merge=unityyamlmerge eol=lf
+*.asset           text merge=unityyamlmerge eol=lf
+*.mat             text merge=unityyamlmerge eol=lf
+*.anim            text merge=unityyamlmerge eol=lf
+*.controller      text merge=unityyamlmerge eol=lf
+*.overrideController text merge=unityyamlmerge eol=lf
+*.physicMaterial  text merge=unityyamlmerge eol=lf
+*.physicsMaterial2D text merge=unityyamlmerge eol=lf
+*.playable        text merge=unityyamlmerge eol=lf
+*.mask            text merge=unityyamlmerge eol=lf
+*.brush           text merge=unityyamlmerge eol=lf
+*.flare           text merge=unityyamlmerge eol=lf
+*.fontsettings    text merge=unityyamlmerge eol=lf
+*.guiskin         text merge=unityyamlmerge eol=lf
+*.giparams        text merge=unityyamlmerge eol=lf
+*.renderTexture   text merge=unityyamlmerge eol=lf
+*.spriteatlas     text merge=unityyamlmerge eol=lf
+*.terrainlayer    text merge=unityyamlmerge eol=lf
+*.mixer           text merge=unityyamlmerge eol=lf
+*.shadervariants  text merge=unityyamlmerge eol=lf
+*.preset          text merge=unityyamlmerge eol=lf
+*.asmdef          text eol=lf
+*.asmref          text eol=lf
+*.inputactions    text eol=lf
+
+# .meta files bind an asset to its GUID; keep them text so it is never mangled.
+*.meta            text eol=lf merge=unityyamlmerge
+
+# Shaders
+*.shader          text eol=lf
+*.cginc           text eol=lf
+*.hlsl            text eol=lf
+*.compute         text eol=lf
+
+# Binary assets. Not using Git LFS today; if that changes, swap `binary` for
+# `filter=lfs diff=lfs merge=lfs -text` on these globs.
+# Images
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.psd   binary
+*.ai    binary
+*.tga   binary
+*.tif   binary
+*.tiff  binary
+*.bmp   binary
+*.ico   binary
+*.exr   binary
+*.hdr   binary
+*.svg   binary
+
+# Audio
+*.mp3   binary
+*.ogg   binary
+*.wav   binary
+*.aif   binary
+*.aiff  binary
+*.flac  binary
+
+# Video
+*.mp4   binary
+*.mov   binary
+*.webm  binary
+
+# 3D
+*.fbx   binary
+*.obj   binary
+*.blend binary
+*.dae   binary
+*.3ds   binary
+
+# Fonts
+*.ttf   binary
+*.otf   binary
+
+# Libraries and packages
+*.dll         binary
+*.so          binary
+*.dylib       binary
+*.a           binary
+*.pdb         binary
+*.mdb         binary
+*.unitypackage binary
+*.aar         binary
+*.jar         binary
+*.bundle      binary
+*.apk         binary
+*.aab         binary
+*.zip         binary
+*.gz          binary
+*.7z          binary
+*.rar         binary
+
+# Generated project files are gitignored, but mark them in case one is force-added.
+*.csproj  linguist-generated=true
+*.sln     linguist-generated=true
+
+# Vendored source. `-text` keeps DOTween's CRLF byte for byte, so the next upstream
+# drop is not a conflict.
+Assets/Plugins/** -text linguist-vendored=true
+
+# Third-party font readme: CRLF and ISO-8859, left byte for byte.
+Assets/Fonts/*.txt -text linguist-vendored=true

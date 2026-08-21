@@ -47,29 +47,49 @@ public class Enemy : MonoBehaviour
     private Coroutine _flashCoroutine;
 
     private SpriteRenderer _spriteRenderer;
-    private GameObject _player;
+
+    // Injected by BattleSceneManager at spawn time; enemies are instantiated from prefabs,
+    // so this cannot come from the inspector.
+    private Transform _xpDropParent;
 
     protected Rigidbody2D _rigidbody2D;
 
     private bool _isDead = false;
-    protected bool IsDead => _isDead;
+
+    /// <summary>
+    /// Whether this enemy is dying or dead. Set the moment it is killed, which is up to
+    /// <c>_deathAnimDuration</c> before the object is destroyed -- targeting has to skip it
+    /// for that whole window, or shots chase a corpse that is shrinking out of existence.
+    /// </summary>
+    public bool IsDead => _isDead;
+
+    /// <summary>Sets the transform that this enemy's XP drop is parented to on death.</summary>
+    public void SetXpDropParent(Transform xpDropParent)
+    {
+        _xpDropParent = xpDropParent;
+    }
 
     protected virtual void Awake()
     {
         _spriteRenderer = GetComponent<SpriteRenderer>();
-        _player = GameObject.Find("Player");
         _rigidbody2D = GetComponent<Rigidbody2D>();
 
-        _originalMaterial = _spriteRenderer.material;
+        // sharedMaterial, not material: reading .material clones a per-renderer copy,
+        // which gives every enemy a unique material and breaks batching.
+        _originalMaterial = _spriteRenderer.sharedMaterial;
     }
 
     // Update is called once per frame
     protected virtual void Update()
     {
+        // Read per frame rather than caching in Awake: an enemy that spawned before the
+        // player resolved used to keep a null reference forever and never move.
+        var player = Player.Instance;
+
         // move towards the player character
-        if (_player != null)
+        if (player != null)
         {
-            var direction = DetermineDirection(_player);
+            var direction = DetermineDirection(player.gameObject);
             _rigidbody2D.linearVelocity = direction * _speed;
 
             // flip sprite in x direction if moving left
@@ -80,18 +100,17 @@ public class Enemy : MonoBehaviour
     /**
      * Returns a normalized vector in the direction of the desired movement
      */
-    virtual protected Vector2 DetermineDirection(GameObject player)
+    protected virtual Vector2 DetermineDirection(GameObject player)
     {
         return Vector3.Normalize(player.transform.position - transform.position);
     }
 
     // a collision handler that is called when the enemy collides with another object
-    virtual protected void OnCollisionEnter2D(UnityEngine.Collision2D collision)
+    protected virtual void OnCollisionEnter2D(UnityEngine.Collision2D collision)
     {
         // if the enemy collides with the player, destroy the player
-        if (collision.gameObject.name == "Player")
+        if (collision.gameObject.TryGetComponent<Player>(out var player))
         {
-            var player = collision.gameObject.GetComponent<Player>();
             DamagePlayer(player);
 
             // Destroy the enemy (for now they explode if they touch the player)
@@ -111,9 +130,9 @@ public class Enemy : MonoBehaviour
 
     private IEnumerator FlashCoroutine()
     {
-        _spriteRenderer.material = _flashMaterial;
+        _spriteRenderer.sharedMaterial = _flashMaterial;
         yield return new WaitForSeconds(_flashDuration);
-        _spriteRenderer.material = _originalMaterial;
+        _spriteRenderer.sharedMaterial = _originalMaterial;
     }
 
     public void Knockback(Vector2 direction, float force)
@@ -136,12 +155,11 @@ public class Enemy : MonoBehaviour
                 if (leaveXp)
                 {
                     // instantiate an xp drop at the captured death position
-                    var xpDropParent = GameObject.Find("Level").transform.Find("XpDrops");
                     var xpDrop = Instantiate(
                         _xpDropPrefab,
                         deathPosition,
                         Quaternion.identity,
-                        xpDropParent
+                        _xpDropParent
                     );
                     xpDrop.SetXp(_xpValue);
                 }
@@ -162,13 +180,19 @@ public class Enemy : MonoBehaviour
     // Deal damage to the player because they touched
     private void DamagePlayer(Player player)
     {
-        Debug.Log("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
+        GameLog.Trace("Enemy.DamagePlayer: Player was damaged by " + gameObject.name);
 
         player.ApplyDamage(_collisionDamage);
     }
 
     public void TakeDamage(int damage)
     {
+        // Death() disables the hitboxes, but that is collider timing, not a guarantee.
+        if (_isDead)
+        {
+            return;
+        }
+
         Flash();
 
         hitpoints -= damage;
@@ -178,11 +202,11 @@ public class Enemy : MonoBehaviour
         var damageTextPosition = new Vector2(transform.position.x, transform.position.y + 1.0f);
         _damageTextPrefab.Spawn(transform.root, damageTextPosition, damage);
 
-        if (hitpoints == 0)
+        if (hitpoints <= 0)
         {
             Death(leaveXp: true);
 
-            EventManager.TriggerEvent("EnemyDestroyed", new EventData(_scoreValue));
+            GameEvents.RaiseEnemyDestroyed(_scoreValue);
         }
     }
 }

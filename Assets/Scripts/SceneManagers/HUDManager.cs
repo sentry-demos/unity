@@ -9,10 +9,10 @@ namespace SceneManagers
     {
         private InputAction _navigateAction;
         private InputAction _submitAction;
-        
+
         [SerializeField] private GameObject tryAgainButton;
         [SerializeField] private GameObject quitButton;
-        
+
         private Highlighter _tryAgainHighlighter;
         private Highlighter _quitHighlighter;
 
@@ -22,15 +22,15 @@ namespace SceneManagers
         {
             _navigateAction = InputSystem.actions.FindAction("Navigate");
             _submitAction = InputSystem.actions.FindAction("Submit");
-            
+
             // Subscribe to input events
             _navigateAction.performed += OnNavigatePerformed;
             _submitAction.performed += OnSubmitPerformed;
-            
+
             _tryAgainHighlighter = tryAgainButton.GetComponent<Highlighter>();
             _quitHighlighter = quitButton.GetComponent<Highlighter>();
         }
-        
+
         private void OnDestroy()
         {
             // Unsubscribe from input events
@@ -44,7 +44,7 @@ namespace SceneManagers
             {
                 return;
             }
-            
+
             // Only invoke if the highlighted button is actually active
             if (_highlightedButton != null && _highlightedButton.activeSelf)
             {
@@ -65,7 +65,7 @@ namespace SceneManagers
             }
 
             var direction = context.ReadValue<Vector2>();
-            
+
             // Simple navigation between try again and quit buttons
             if (_highlightedButton == null)
             {
@@ -95,11 +95,11 @@ namespace SceneManagers
         {
             _tryAgainHighlighter.Highlight(false);
             _quitHighlighter.Highlight(false);
-        
+
             highlighted.Highlight();
             _highlightedButton = highlighted.gameObject;
         }
-        
+
         public void ClearHighlightedButton()
         {
             _tryAgainHighlighter.Highlight(false);

@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class Raven : WeaponBase
@@ -17,26 +15,30 @@ public class Raven : WeaponBase
     private float _spawnDistanceOutsidePlayer = 1.25f;
 
     [SerializeField]
-    [Tooltip("Distance from player to detect enemies")]
-    private float _detectRadius = 12.0f;
-
-    [SerializeField]
     private RavenProjectile _ravenProjectilePrefab;
 
     private GameObject _player;
+    private AutoAim _autoAim;
 
     public void Start()
     {
         _player = Player.Instance.gameObject;
+        _autoAim = Player.Instance.GetComponent<AutoAim>();
     }
 
     public override void Fire()
     {
         base.Fire();
 
-        var targets = GetTargets(_detectRadius, Count);
+        if (_autoAim == null)
+        {
+            return;
+        }
 
-        // foreach
+        // Shares the auto-aim's ranking, so every weapon agrees on which enemies are worth
+        // hitting -- the ravens spread over the best Count of them rather than the nearest.
+        var targets = _autoAim.GetTargets(Count);
+
         foreach (var target in targets)
         {
             var projectile = Instantiate(_ravenProjectilePrefab);
@@ -51,55 +53,5 @@ public class Raven : WeaponBase
             projectile.transform.position =
                 _player.transform.position + direction.normalized * _spawnDistanceOutsidePlayer;
         }
-    }
-
-    private List<GameObject> GetEnemiesWithinRange(float range)
-    {
-        List<GameObject> enemies = new List<GameObject> { };
-
-        RaycastHit2D[] hits = Physics2D.CircleCastAll(
-            _player.transform.position,
-            range,
-            Vector2.zero
-        );
-        foreach (RaycastHit2D hit in hits)
-        {
-            if (hit.collider != null && hit.collider.gameObject.CompareTag("Enemy"))
-            {
-                enemies.Add(hit.collider.gameObject);
-            }
-        }
-        return enemies;
-    }
-
-    private List<GameObject> GetTargets(float radius, int count)
-    {
-        List<GameObject> enemies = GetEnemiesWithinRange(radius);
-        List<GameObject> targets = new List<GameObject> { };
-
-        Vector3 playerPosition = _player.transform.position;
-
-        var maxTargets = Math.Min(count, enemies.Count);
-        for (int i = 0; i < maxTargets; i++)
-        {
-            // find the next closest
-            float shortestDistance = Mathf.Infinity;
-            GameObject target = null;
-
-            foreach (GameObject enemy in enemies)
-            {
-                Vector3 diff = enemy.transform.position - playerPosition;
-                float enemyDistance = diff.sqrMagnitude;
-                if (enemyDistance < shortestDistance)
-                {
-                    target = enemy;
-                    shortestDistance = enemyDistance;
-                }
-            }
-
-            enemies.Remove(target);
-            targets.Add(target);
-        }
-        return targets;
     }
 }
