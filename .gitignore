@@ -130,3 +130,36 @@ InitTestScene*.unity*
 # Local working notes. PLAN.md is a scratch document for tracking cleanup work in
 # progress - it is deliberately not part of the repository.
 /PLAN.md
+/branch-changes-for-upstream-merge.md
+/sentry-instrumentation-plan.md
+/switch-connectivity-issue.md
+
+# Console SDKs and platform files (NDA material - Nintendo/Sony). These live in the
+# working tree for local console builds but must never be committed.
+/Assets/NintendoSDKPlugin
+/Assets/NintendoSDKPlugin.meta
+/Assets/Plugins/Sentry/Switch
+/Assets/Plugins/Sentry/Switch.meta
+/Packages/com.unity.inputsystem.switch
+/Packages/com.unity.inputsystem.ps5-*
+/Packages/com.unity.render-pipelines.ps5-*
+/ProjectSettings/PS5Settings.json
+/sce_sys
+/param.json
+/sentaursurvivors.nmeta
+/friends_Applet.o
+*.nmeta
+
+# Windows handheld helper binaries (built separately, not part of the repo).
+/Assets/Plugins/x64
+/Assets/Plugins/x64.meta
+/Assets/Plugins/x86
+/Assets/Plugins/x86.meta
+
+# Locally embedded copies of the Sentry SDK (e.g. from a dev checkout).
+/Packages/io.sentry.unity*
+
+# Unity crash-recovery output and editor stray files.
+/Assets/_Recovery
+/Assets/_Recovery.meta
+/LOG
