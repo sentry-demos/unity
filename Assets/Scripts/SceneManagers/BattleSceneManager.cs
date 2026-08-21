@@ -71,6 +71,20 @@ public class BattleSceneManager : MonoBehaviour
     private float _gameStartTime;
     private bool _isDeathEnemyPresent = false;
 
+    // Intentional crash: enter the d-pad sequence Up Up Down Down Left Right Left Right in
+    // order. A wrong direction or a pause longer than CrashSeqTimeout resets progress.
+    // Deliberately obscure so it can't be hit by accident; routes through the same crash
+    // path as CrashOnGameOver (SaveScoreToDisk) for the same clean, named native frame.
+    private const float CrashSeqTimeout = 2f;
+    private InputAction _crashSeqUp;
+    private InputAction _crashSeqDown;
+    private InputAction _crashSeqLeft;
+    private InputAction _crashSeqRight;
+    // Direction codes: 0 = Up, 1 = Down, 2 = Left, 3 = Right
+    private static readonly int[] CrashSequence = { 0, 0, 1, 1, 2, 3, 2, 3 };
+    private int _crashSeqIndex = 0;
+    private float _crashSeqLastInputTime = 0f;
+
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
@@ -112,6 +126,65 @@ public class BattleSceneManager : MonoBehaviour
         _metrics.RunStarted(Time.time, _progression.CurrentLevel);
 
         _hud.SetCurrentLevel(_progression.CurrentLevel);
+
+        // The actual crash is fired from Update() once the d-pad crash sequence is entered
+        // (see CrashSequence / CheckForceCrash). Missing actions just disable the trigger.
+        _crashSeqUp = InputSystem.actions.FindAction("CrashSeqUp");
+        _crashSeqDown = InputSystem.actions.FindAction("CrashSeqDown");
+        _crashSeqLeft = InputSystem.actions.FindAction("CrashSeqLeft");
+        _crashSeqRight = InputSystem.actions.FindAction("CrashSeqRight");
+        _crashSeqIndex = 0;
+    }
+
+    // Intentional crash trigger. Fires only after the exact d-pad sequence Up Up Down Down
+    // Left Right Left Right is entered in order (a wrong direction or a pause > CrashSeqTimeout
+    // resets), so it can't be hit by accident. NOTE: like CrashOnGameOver, this only crashes in
+    // a player build; in the Editor SaveScoreToDisk just logs.
+    private void CheckForceCrash()
+    {
+        var pressed = -1;
+        var pressedCount = 0;
+        if (_crashSeqUp != null && _crashSeqUp.WasPressedThisFrame()) { pressed = 0; pressedCount++; }
+        if (_crashSeqDown != null && _crashSeqDown.WasPressedThisFrame()) { pressed = 1; pressedCount++; }
+        if (_crashSeqLeft != null && _crashSeqLeft.WasPressedThisFrame()) { pressed = 2; pressedCount++; }
+        if (_crashSeqRight != null && _crashSeqRight.WasPressedThisFrame()) { pressed = 3; pressedCount++; }
+
+        if (pressedCount == 0)
+        {
+            return;
+        }
+
+        // More than one direction in the same frame (e.g. a diagonal) - treat as a miss and
+        // start over.
+        if (pressedCount > 1)
+        {
+            _crashSeqIndex = 0;
+            return;
+        }
+
+        // Reset progress if the player paused too long since the last input.
+        if (Time.unscaledTime - _crashSeqLastInputTime > CrashSeqTimeout)
+        {
+            _crashSeqIndex = 0;
+        }
+        _crashSeqLastInputTime = Time.unscaledTime;
+
+        if (pressed == CrashSequence[_crashSeqIndex])
+        {
+            _crashSeqIndex++;
+            if (_crashSeqIndex >= CrashSequence.Length)
+            {
+                Debug.Log("ForceCrash triggered via d-pad sequence.");
+                _crashSeqIndex = 0;
+                SaveScoreToDisk();
+            }
+        }
+        else
+        {
+            // Wrong direction: reset, but let this press start a fresh attempt if it happens
+            // to be the first input of the sequence.
+            _crashSeqIndex = (pressed == CrashSequence[0]) ? 1 : 0;
+        }
     }
 
     // GameEvents is static, so subscriptions outlive the scene. "Try Again" reloads
@@ -318,6 +391,10 @@ public class BattleSceneManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
+        // Checked before the playing-state gate so the crash demo also works while paused or
+        // on the game-over screen.
+        CheckForceCrash();
+
         if (_gameState != GameState.Playing)
         {
             return;
