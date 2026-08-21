@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Set run ID
-        # Scheduled runs use the newest successful main build; callers use their own run.
+        # Scheduled runs resolve the newest live Windows artifact on main; callers use their own run.
         id: get-run
         shell: pwsh
         env:
@@ -34,17 +34,28 @@ jobs:
             exit 0
           }
 
-          $uri = 'https://api.github.com/repos/${{ github.repository }}/actions/workflows/ci.yml/runs' +
-            '?branch=main&status=success&per_page=1'
-          $runs = Invoke-RestMethod -Uri $uri -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+          # Deliberately keyed off the artifact, not the run conclusion: a build run is
+          # marked failed when any platform fails, and the demo only needs the Windows
+          # player. Asking for a green run made this fall back to a months-old build
+          # whose artifact had a different internal layout.
+          $artifact = 'SentaurSurvivors-StandaloneWindows64'
+          $uri = 'https://api.github.com/repos/${{ github.repository }}/actions/artifacts' +
+            "?name=$artifact&per_page=100"
+          $found = Invoke-RestMethod -Uri $uri -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+
+          # Newest first, so the first live main artifact wins.
+          $match = $found.artifacts |
+            Where-Object { -not $_.expired -and $_.workflow_run.head_branch -eq 'main' } |
+            Select-Object -First 1
 
           # Without this the run ID comes out empty and every download below fails with a
           # confusing "artifact not found" instead of naming the real problem.
-          if (-not $runs.workflow_runs -or $runs.workflow_runs.Count -eq 0) {
-            throw 'No successful build run found on main to take artifacts from.'
+          if (-not $match) {
+            throw "No live '$artifact' artifact found on main to take the player from."
           }
 
-          "run-id=$($runs.workflow_runs[0].id)" >> $env:GITHUB_OUTPUT
+          Write-Host "Using $artifact from run $($match.workflow_run.id) ($($match.created_at))."
+          "run-id=$($match.workflow_run.id)" >> $env:GITHUB_OUTPUT
 
   run-windows:
     name: Run Windows Build
