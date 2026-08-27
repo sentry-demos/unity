@@ -11,6 +11,10 @@ inputs:
   license-server-url:
     description: Base URL of the Unity floating license server.
     required: true
+  cli-version:
+    description: Unity CLI version to install. The run fails if a different version ends up on PATH.
+    required: false
+    default: 1.0.0-beta.3
 
 outputs:
   unity-version:
@@ -39,14 +43,19 @@ runs:
 
     # The install scripts differ per OS, but everything downstream is the same, so
     # this is the only place the runner OS is branched on.
+    # Both installers take the pinned version, by parameter on Windows and by
+    # UNITY_CLI_VERSION everywhere else. Passing it also makes the installer resolve
+    # <version>/latest.json directly instead of the channel manifest, so the channel
+    # moving underneath us cannot change what gets installed.
     - name: Install Unity CLI
       shell: pwsh
       env:
         UNITY_CLI_CHANNEL: beta
+        UNITY_CLI_VERSION: ${{ inputs.cli-version }}
       run: |
         if ($IsWindows) {
           $installer = Invoke-RestMethod https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1
-          & ([scriptblock]::Create($installer)) -Channel beta
+          & ([scriptblock]::Create($installer)) -Target '${{ inputs.cli-version }}' -Channel beta
           "$env:LOCALAPPDATA\Unity\bin" >> $env:GITHUB_PATH
         } else {
           curl -fsSL https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.sh | bash
@@ -55,14 +64,19 @@ runs:
           $binDirectory >> $env:GITHUB_PATH
         }
 
-    # Only checks that the CLI is on PATH and runs. The beta channel bumps often and
-    # pinning an exact version breaks the build for no benefit.
+    # A mismatch here means the pin did not take, which is worth failing on: an
+    # unpinned CLI installs the linux-il2cpp module without the editor finding it,
+    # and that only surfaces minutes later as "scripting backend is not installed".
     - name: Verify Unity CLI
       shell: pwsh
       run: |
         $version = (unity --version 2>&1 | Out-String).Trim()
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($version)) {
           throw "Unity CLI is not usable: 'unity --version' exited with $LASTEXITCODE and printed '$version'."
+        }
+
+        if ($version -ne '${{ inputs.cli-version }}') {
+          throw "Expected Unity CLI ${{ inputs.cli-version }}, found $version."
         }
 
         Write-Host "Unity CLI $version"
