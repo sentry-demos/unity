@@ -1,5 +1,5 @@
 using System;
-#if !UNITY_SWITCH
+#if !UNITY_SWITCH && !UNITY_SWITCH2
 using System.Net.Http;
 #endif
 #if UNITY_STANDALONE_WIN
@@ -10,7 +10,7 @@ using Sentry;
 using Sentry.Unity;
 using TMPro;
 using UnityEngine;
-#if UNITY_SWITCH
+#if UNITY_SWITCH || UNITY_SWITCH2
 using System.Collections.Generic;
 using UnityEngine.Networking;
 #endif
@@ -46,7 +46,7 @@ public class ScorePoster : MonoBehaviour
     public event Action OnVirtualKeyboardClosedWithText;
 
     private string _jwtToken;
-#if !UNITY_SWITCH
+#if !UNITY_SWITCH && !UNITY_SWITCH2
     private HttpClient _httpClient;
 #endif
 
@@ -115,7 +115,7 @@ public class ScorePoster : MonoBehaviour
     {
         if (_demoConfig != null && _demoConfig.Enabled && !string.IsNullOrEmpty(_demoConfig.ApiUrl))
         {
-#if !UNITY_SWITCH
+#if !UNITY_SWITCH && !UNITY_SWITCH2
             _httpClient = new HttpClient(new SentryHttpMessageHandler());
 #endif
             _loginTask = LoginAsync();
@@ -167,7 +167,7 @@ public class ScorePoster : MonoBehaviour
 #endif
         }
 
-#if !UNITY_SWITCH
+#if !UNITY_SWITCH && !UNITY_SWITCH2
         // "Try Again" reloads the scene, so this would otherwise leak per reload.
         _httpClient?.Dispose();
         _httpClient = null;
@@ -261,9 +261,9 @@ public class ScorePoster : MonoBehaviour
             var json = JsonUtility.ToJson(_demoConfig.User);
             var url = _demoConfig.ApiUrl + "/token";
 
-#if UNITY_SWITCH
-            // HttpClient + SentryHttpMessageHandler do not work on Switch, so the request goes
-            // through UnityWebRequest and this block reproduces what the handler would have
+#if UNITY_SWITCH || UNITY_SWITCH2
+            // HttpClient + SentryHttpMessageHandler do not work on Switch or Switch 2, so the request
+            // goes through UnityWebRequest and this block reproduces what the handler would have
             // done: the http.client child span, trace-header propagation, the breadcrumb, and
             // the failed-request event.
             var span = transaction.StartChild("http.client", $"POST {url}");
@@ -434,9 +434,9 @@ public class ScorePoster : MonoBehaviour
         {
             var url = _demoConfig.ApiUrl + "/score";
 
-#if UNITY_SWITCH
+#if UNITY_SWITCH || UNITY_SWITCH2
             // Same manual UnityWebRequest path as LoginAsync (HttpClient does not work on
-            // Switch): http.client span, trace headers, breadcrumb, failed-request event.
+            // Switch or Switch 2): http.client span, trace headers, breadcrumb, failed-request event.
             var span = uploadTransaction.StartChild("http.client", $"POST {url}");
             span.SetExtra("http.request.method", "POST");
             var uri = new Uri(url);
@@ -527,7 +527,7 @@ public class ScorePoster : MonoBehaviour
         }
     }
 
-#if UNITY_SWITCH
+#if UNITY_SWITCH || UNITY_SWITCH2
     /// <summary>
     /// Propagates the sentry-trace and baggage headers to the outgoing request, so the
     /// leaderboard backend joins the distributed trace. Mimics

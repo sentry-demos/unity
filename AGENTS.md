@@ -1,6 +1,6 @@
 # Sentaur Survivors — agent guide
 
-Sentry-themed Vampire Survivors clone. Unity **6000.3.21f1** (pinned in
+Sentry-themed Vampire Survivors clone. Unity **6000.5.10f1** (pinned in
 `ProjectSettings/ProjectVersion.txt`), URP, new Input System.
 
 ## Read first
@@ -8,6 +8,10 @@ Sentry-themed Vampire Survivors clone. Unity **6000.3.21f1** (pinned in
 - **Some bugs here are on purpose** — Sentry demo faults gated behind `DemoConfiguration`
   (`Assets/Scripts/Config/DemoConfiguration.cs`), live only with `-demo` or `SENTRY_DEMO`.
 - Reachable with the demo config **off** → real bug, fix it. **On** only → instrumentation, leave it.
+- **One deliberate exception:** the d-pad force-crash (Up Up Down Down Left Right Left Right,
+  `BattleSceneManager.CheckForceCrash`) is ungated on purpose. It fires the same native
+  `SaveScoreToDisk` crash as `CrashOnGameOver`, but without the demo config, so the crash can
+  be demoed on a console build that was not launched with `-demo`. Not a bug — leave it.
 - Renaming a Unity-serialised field drops its value in every prefab and scene that uses it.
 - Full rules, coding style and folder notes: `CONTRIBUTING.md`.
 

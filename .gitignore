@@ -140,10 +140,15 @@ InitTestScene*.unity*
 /Assets/NintendoSDKPlugin.meta
 /Assets/Plugins/Sentry/Switch
 /Assets/Plugins/Sentry/Switch.meta
-/Packages/com.unity.inputsystem.switch
+/Assets/Plugins/Sentry/Switch2
+/Assets/Plugins/Sentry/Switch2.meta
+/Packages/com.unity.inputsystem.switch*
 /Packages/com.unity.inputsystem.ps5-*
 /Packages/com.unity.render-pipelines.ps5-*
 /ProjectSettings/PS5Settings.json
+# Switch 2 keeps its player settings in their own asset; Switch 1 stores them
+# inline in ProjectSettings.asset.
+/ProjectSettings/Switch2PlayerSettings.asset
 /sce_sys
 /param.json
 /sentaursurvivors.nmeta
