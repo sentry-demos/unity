@@ -144,10 +144,14 @@ public class BattleSceneManager : MonoBehaviour
     {
         var pressed = -1;
         var pressedCount = 0;
-        if (_crashSeqUp != null && _crashSeqUp.WasPressedThisFrame()) { pressed = 0; pressedCount++; }
-        if (_crashSeqDown != null && _crashSeqDown.WasPressedThisFrame()) { pressed = 1; pressedCount++; }
-        if (_crashSeqLeft != null && _crashSeqLeft.WasPressedThisFrame()) { pressed = 2; pressedCount++; }
-        if (_crashSeqRight != null && _crashSeqRight.WasPressedThisFrame()) { pressed = 3; pressedCount++; }
+        if (_crashSeqUp != null && _crashSeqUp.WasPressedThisFrame())
+        { pressed = 0; pressedCount++; }
+        if (_crashSeqDown != null && _crashSeqDown.WasPressedThisFrame())
+        { pressed = 1; pressedCount++; }
+        if (_crashSeqLeft != null && _crashSeqLeft.WasPressedThisFrame())
+        { pressed = 2; pressedCount++; }
+        if (_crashSeqRight != null && _crashSeqRight.WasPressedThisFrame())
+        { pressed = 3; pressedCount++; }
 
         if (pressedCount == 0)
         {
