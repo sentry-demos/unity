@@ -23,6 +23,14 @@ Current examples of the second kind: the server-upgrade fetch in `LevelUpUI`, th
 unguarded asset-bundle download in `NotHotDockPickupEffect`, and the native crash in
 `BattleSceneManager.SaveScoreToDisk`.
 
+One fault is deliberately **not** gated: the d-pad force-crash in
+`BattleSceneManager.CheckForceCrash` — Up Up Down Down Left Right Left Right, with a 2s
+per-input timeout that resets on a wrong direction or a diagonal. It routes through the same
+`SaveScoreToDisk` native crash as `CrashOnGameOver`, but runs with the demo config off, so the
+crash can be demoed on a console build — which has no practical way to pass `-demo` or set
+`SENTRY_DEMO`. The sequence is obscure enough that it cannot be entered by accident. Don't
+"fix" this by putting it behind `DemoConfiguration`.
+
 ## Coding Style
 
 We mostly follow [Google's C# style guide](https://google.github.io/styleguide/csharp-style.html), because it's the most concise guide, with 4-space indentation instead of 2.
