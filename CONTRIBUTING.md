@@ -7,11 +7,11 @@ things going wrong — crashes, failed network calls, unhandled exceptions — s
 be seen catching them. **Those faults are deliberate. Don't fix them.**
 
 Intentional faults are gated behind a flag on `DemoConfiguration`
-(`Assets/Scripts/Config/DemoConfiguration.cs`): `AutoPlay`, `NotHotDogParticleEffect`,
-`FetchUpgradeFromServer` and `CrashOnGameOver`, each ANDed with the `_enabled` master
-switch. `Assets/Resources/DemoConfig.asset` ships with every flag off; they're turned on
-by passing `-demo` on the command line or setting the `SENTRY_DEMO` environment
-variable, which is what CI's demo run does.
+(`Assets/Scripts/Config/DemoConfiguration.cs`), under the **CI Demo** heading: `AutoPlay`,
+`NotHotDogParticleEffect`, `FetchUpgradeFromServer` and `CrashOnGameOver`, each ANDed with
+the `_enabled` master switch. `Assets/Resources/DemoConfig.asset` ships with every flag off;
+they're turned on by passing `-demo` on the command line or setting the `SENTRY_DEMO`
+environment variable, which is what CI's demo run does.
 
 So the rule of thumb when you find something broken:
 
@@ -23,13 +23,40 @@ Current examples of the second kind: the server-upgrade fetch in `LevelUpUI`, th
 unguarded asset-bundle download in `NotHotDockPickupEffect`, and the native crash in
 `BattleSceneManager.SaveScoreToDisk`.
 
-One fault is deliberately **not** gated: the d-pad force-crash in
+One fault is deliberately **not** covered by the master switch: the d-pad force-crash in
 `BattleSceneManager.CheckForceCrash` — Up Up Down Down Left Right Left Right, with a 2s
 per-input timeout that resets on a wrong direction or a diagonal. It routes through the same
 `SaveScoreToDisk` native crash as `CrashOnGameOver`, but runs with the demo config off, so the
 crash can be demoed on a console build — which has no practical way to pass `-demo` or set
-`SENTRY_DEMO`. The sequence is obscure enough that it cannot be entered by accident. Don't
-"fix" this by putting it behind `DemoConfiguration`.
+`SENTRY_DEMO`. The sequence is obscure enough that it cannot be entered by accident.
+
+It has its own flag, `KonamiCrash`, under its own heading, so it can be ruled out while
+debugging. That flag is **on by default and must stay that way**, and it must **not** be ANDed
+with `_enabled` — doing so makes it unreachable on exactly the builds it exists for. Because it
+is a new serialized field, its value is also written explicitly into `DemoConfig.asset`: a
+field that only exists as a C# initializer is one asset re-save away from silently flipping.
+
+## Configuration lives in two assets
+
+`Assets/Resources/DemoConfig.asset` is **committed**. It holds the deliberate faults and
+describes what CI does.
+
+`Assets/Resources/LeaderboardConfig.asset` is **gitignored**, along with its `.meta`. It holds
+the score mode (`None`, `Local`, `Remote`), the backend URL and the credentials. There are two
+use cases and they want different things: CI builds and plays with no leaderboard at all, a
+kiosk build posts to a real backend. Keeping it out of the repo means neither carries the
+other's settings and no credential is ever committed.
+
+So **a missing leaderboard asset is the normal case, not an error**, and it means `Local` —
+local scores need no configuration, remote scores need it by definition. Two rules follow:
+
+* Read it through the static members on `LeaderboardConfiguration`, which all answer sensibly
+  with no asset present. Don't null-check it at every call site.
+* Never reference it from a serialized inspector slot. That resolves to null on any machine
+  without the asset and makes the referencing scene or prefab churn depending on who opened it.
+
+Anything in that asset ships inside the player build and is extractable from it, so keep the
+leaderboard account throwaway.
 
 ## Coding Style
 

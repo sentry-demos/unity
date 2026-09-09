@@ -13,11 +13,8 @@ MonoBehaviour:
   m_Name: DemoConfig
   m_EditorClassIdentifier: 
   _enabled: 0
-  _apiUrl:
-  _user:
-    Username:
-    Password:
   _autoPlay: 0
   _notHotDogParticleEffect: 0
   _fetchUpgradeFromServer: 0
   _crashOnGameOver: 0
+  _konamiCrash: 1

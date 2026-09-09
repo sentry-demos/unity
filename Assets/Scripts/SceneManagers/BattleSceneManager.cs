@@ -75,6 +75,8 @@ public class BattleSceneManager : MonoBehaviour
     // order. A wrong direction or a pause longer than CrashSeqTimeout resets progress.
     // Deliberately obscure so it can't be hit by accident; routes through the same crash
     // path as CrashOnGameOver (SaveScoreToDisk) for the same clean, named native frame.
+    // Armed by DemoConfiguration.KonamiCrash, which is on by default and deliberately not
+    // covered by the master switch -- see the remarks on that property.
     private const float CrashSeqTimeout = 2f;
     private InputAction _crashSeqUp;
     private InputAction _crashSeqDown;
@@ -142,6 +144,13 @@ public class BattleSceneManager : MonoBehaviour
     // a player build; in the Editor SaveScoreToDisk just logs.
     private void CheckForceCrash()
     {
+        // No config asset at all leaves the sequence armed: that is how it ships, and it is
+        // what a console build depends on.
+        if (_demoConfig != null && !_demoConfig.KonamiCrash)
+        {
+            return;
+        }
+
         var pressed = -1;
         var pressedCount = 0;
         if (_crashSeqUp != null && _crashSeqUp.WasPressedThisFrame())

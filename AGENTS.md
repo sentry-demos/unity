@@ -9,9 +9,14 @@ Sentry-themed Vampire Survivors clone. Unity **6000.5.10f1** (pinned in
   (`Assets/Scripts/Config/DemoConfiguration.cs`), live only with `-demo` or `SENTRY_DEMO`.
 - Reachable with the demo config **off** → real bug, fix it. **On** only → instrumentation, leave it.
 - **One deliberate exception:** the d-pad force-crash (Up Up Down Down Left Right Left Right,
-  `BattleSceneManager.CheckForceCrash`) is ungated on purpose. It fires the same native
-  `SaveScoreToDisk` crash as `CrashOnGameOver`, but without the demo config, so the crash can
-  be demoed on a console build that was not launched with `-demo`. Not a bug — leave it.
+  `BattleSceneManager.CheckForceCrash`) has its own flag, `DemoConfiguration.KonamiCrash`, which
+  is **on by default and not ANDed with the master switch**. It fires the same native
+  `SaveScoreToDisk` crash as `CrashOnGameOver`, but with the demo config off, so the crash can
+  be demoed on a console build that was not launched with `-demo`. Not a bug — leave it armed.
+- **Two config assets, only one committed.** `DemoConfig.asset` (faults, checked in) and
+  `LeaderboardConfig.asset` (score mode, backend URL, credentials, **gitignored**). A missing
+  leaderboard asset is the normal case and means local scores. Read it through the static
+  members on `LeaderboardConfiguration`, never a serialized inspector reference.
 - Renaming a Unity-serialised field drops its value in every prefab and scene that uses it.
 - Full rules, coding style and folder notes: `CONTRIBUTING.md`.
 

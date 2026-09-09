@@ -35,7 +35,6 @@ public class ScorePoster : MonoBehaviour
     [SerializeField] private Button _submitButton;
     [SerializeField] private BattleSceneManager _gameManager;
 
-    private DemoConfiguration _demoConfig;
     private TextMeshProUGUI _buttonText;
 
     // For HUDManager, which drives controller navigation across the game-over screen.
@@ -72,7 +71,6 @@ public class ScorePoster : MonoBehaviour
 
     private void Awake()
     {
-        _demoConfig = DemoConfiguration.Load();
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
 
         _submitButton.onClick.AddListener(OnSubmit);
@@ -113,7 +111,8 @@ public class ScorePoster : MonoBehaviour
 
     private void Start()
     {
-        if (_demoConfig != null && _demoConfig.Enabled && !string.IsNullOrEmpty(_demoConfig.ApiUrl))
+        if (LeaderboardConfiguration.Mode == ScoreMode.Remote
+            && !string.IsNullOrEmpty(LeaderboardConfiguration.ApiUrl))
         {
 #if !UNITY_SWITCH && !UNITY_SWITCH2
             _httpClient = new HttpClient(new SentryHttpMessageHandler());
@@ -258,8 +257,8 @@ public class ScorePoster : MonoBehaviour
 
         try
         {
-            var json = JsonUtility.ToJson(_demoConfig.User);
-            var url = _demoConfig.ApiUrl + "/token";
+            var json = JsonUtility.ToJson(LeaderboardConfiguration.Credentials);
+            var url = LeaderboardConfiguration.ApiUrl + "/token";
 
 #if UNITY_SWITCH || UNITY_SWITCH2
             // HttpClient + SentryHttpMessageHandler do not work on Switch or Switch 2, so the request
@@ -432,7 +431,7 @@ public class ScorePoster : MonoBehaviour
 
         try
         {
-            var url = _demoConfig.ApiUrl + "/score";
+            var url = LeaderboardConfiguration.ApiUrl + "/score";
 
 #if UNITY_SWITCH || UNITY_SWITCH2
             // Same manual UnityWebRequest path as LoginAsync (HttpClient does not work on

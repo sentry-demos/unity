@@ -168,3 +168,9 @@ InitTestScene*.unity*
 /Assets/_Recovery
 /Assets/_Recovery.meta
 /LOG
+
+# Per-machine leaderboard settings: score mode, backend URL and credentials. CI ships no
+# asset at all (which means local scores), a kiosk build has a real one. Deliberately not
+# committed so neither carries the other's settings and no credential lands in the repo.
+/Assets/Resources/LeaderboardConfig.asset
+/Assets/Resources/LeaderboardConfig.asset.meta

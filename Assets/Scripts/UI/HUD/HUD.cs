@@ -24,13 +24,10 @@ public class HUD : MonoBehaviour
 
     private int _lastScore;
 
-    private DemoConfiguration _demoConfig;
     private XpBar _xpBar;
 
     private void Awake()
     {
-        _demoConfig = DemoConfiguration.Load();
-
         // get score text component from child
         _scoreText = transform.Find("Score").GetComponent<TextMeshProUGUI>();
         _timeElapsedText = transform.Find("TimeElapsed").GetComponent<TextMeshProUGUI>();
