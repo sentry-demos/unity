@@ -24,6 +24,9 @@ public class ScorePoster : MonoBehaviour
     [Tooltip("Optional: the light saying whether the score has anywhere to go")]
     [SerializeField] private ConnectionIndicator _connectionIndicator;
 
+    [Tooltip("Optional: the on-device top ten, shown once a run has been recorded")]
+    [SerializeField] private LeaderboardBoard _board;
+
     private TextMeshProUGUI _buttonText;
 
     /// <summary>Where the score goes. Null when this mode keeps no scores at all.</summary>
@@ -115,6 +118,11 @@ public class ScorePoster : MonoBehaviour
         {
             _connectionIndicator.Unbind();
         }
+
+        if (_board != null)
+        {
+            _board.Hide();
+        }
     }
 
     private void OnNameChanged()
@@ -201,6 +209,15 @@ public class ScorePoster : MonoBehaviour
 
         var stored = await _store.SubmitAsync(entry);
         _buttonText.text = stored ? "Posted!" : "Retry";
+
+        if (stored && _board != null && await _board.ShowAsync(_store, entry.Key))
+        {
+            // The board takes the screen over from the entry form, which has done its job.
+            // Nothing to show means the store keeps no board, so the form stays put.
+            _root.SetActive(false);
+            _connectionIndicator?.Unbind();
+        }
+
         return stored;
     }
 }
