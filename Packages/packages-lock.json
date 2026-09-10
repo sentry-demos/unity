@@ -185,30 +185,6 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.inputsystem.ps5": {
-      "version": "file:com.unity.inputsystem.ps5-0.3.0-preview",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.inputsystem": "1.10.0"
-      }
-    },
-    "com.unity.inputsystem.switch": {
-      "version": "file:com.unity.inputsystem.switch@1.0.0",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.inputsystem": "1.1.0"
-      }
-    },
-    "com.unity.inputsystem.switch2": {
-      "version": "file:com.unity.inputsystem.switch2-1.0.2",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {
-        "com.unity.inputsystem": "1.1.0-pre.5"
-      }
-    },
     "com.unity.mathematics": {
       "version": "1.4.0",
       "depth": 2,
@@ -245,7 +221,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.pipeline": {
-      "version": "0.5.0-exp.1",
+      "version": "0.6.0-exp.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -268,12 +244,6 @@
         "com.unity.modules.terrain": "1.0.0",
         "com.unity.modules.jsonserialize": "1.0.0"
       }
-    },
-    "com.unity.render-pipelines.ps5": {
-      "version": "file:com.unity.render-pipelines.ps5-1.10.1",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {}
     },
     "com.unity.render-pipelines.universal": {
       "version": "17.5.0",
