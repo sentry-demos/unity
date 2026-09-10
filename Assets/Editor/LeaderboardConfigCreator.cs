@@ -42,8 +42,12 @@ public static class LeaderboardConfigCreator
         AssetDatabase.SaveAssets();
 
         Debug.Log(
-            $"Created {AssetPath} set to Local. It is gitignored on purpose: fill in the URL and "
-                + "login here only if this machine should post to the backend."
+            $"Created {AssetPath}, set to Local.\n"
+                + "For a machine that builds for consoles or handhelds, set Score Handling to "
+                + "Remote and fill in the API URL, Username and Password on the asset now "
+                + "selected in the Project window.\n"
+                + "It is gitignored on purpose, so it stays on this machine. Note the asset "
+                + "ships inside every player build made here, credentials and all."
         );
 
         Selection.activeObject = config;
