@@ -3,6 +3,7 @@ using System.Collections.Generic;
 #if !UNITY_SWITCH && !UNITY_SWITCH2
 using System.Net.Http;
 #endif
+using System.Threading;
 using System.Threading.Tasks;
 using Sentry;
 using Sentry.Unity;
@@ -56,11 +57,50 @@ public sealed class RemoteScoreStore : IScoreStore
     /// <summary>The backend takes a full name.</summary>
     public int NameLengthLimit => 0;
 
-    public ConnectionState Connection { get; private set; } = ConnectionState.Disconnected;
+    private ConnectionState _connection = ConnectionState.Disconnected;
+    private bool _disposed;
+
+    public ConnectionState Connection
+    {
+        get => _connection;
+        private set
+        {
+            if (_connection == value)
+            {
+                return;
+            }
+
+            _connection = value;
+            ConnectionChanged?.Invoke(value);
+        }
+    }
+
+    public event Action<ConnectionState> ConnectionChanged;
+
+    /// <summary>
+    /// Reaches the backend without posting anything, so the indicator can go green before the
+    /// player has typed a name. Shares the session with <see cref="SubmitAsync"/>: connecting
+    /// here means the submit will not have to.
+    /// </summary>
+    public async Task TryConnectAsync(CancellationToken cancellationToken)
+    {
+        if (_disposed || !CanSubmit)
+        {
+            return;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await EnsureSessionAsync(cancellationToken);
+    }
 
     public async Task<bool> SubmitAsync(ScoreEntry entry)
     {
-        if (!await EnsureSessionAsync())
+        if (_disposed)
+        {
+            return false;
+        }
+
+        if (!await EnsureSessionAsync(CancellationToken.None))
         {
             Debug.Log("Not uploading the score: no leaderboard session.");
             GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, "no_session"));
@@ -81,6 +121,10 @@ public sealed class RemoteScoreStore : IScoreStore
 
     public void Dispose()
     {
+        // "Try Again" reloads the scene while a retry may still be in flight. Anything that
+        // wakes up after this must find a store that refuses rather than a disposed client.
+        _disposed = true;
+
 #if !UNITY_SWITCH && !UNITY_SWITCH2
         // "Try Again" reloads the scene, so this would otherwise leak per reload.
         _httpClient?.Dispose();
@@ -92,7 +136,7 @@ public sealed class RemoteScoreStore : IScoreStore
     /// Logs in if there is no usable session yet, awaiting a login already in flight rather than
     /// starting a second one.
     /// </summary>
-    private async Task<bool> EnsureSessionAsync()
+    private async Task<bool> EnsureSessionAsync(CancellationToken cancellationToken)
     {
         if (!string.IsNullOrEmpty(_jwtToken))
         {
@@ -103,7 +147,7 @@ public sealed class RemoteScoreStore : IScoreStore
         // player pressing Submit again is exactly the retry that should get a fresh try.
         if (_loginTask == null || _loginTask.IsCompleted)
         {
-            _loginTask = LoginAsync();
+            _loginTask = LoginAsync(cancellationToken);
         }
 
         await _loginTask;
@@ -114,7 +158,7 @@ public sealed class RemoteScoreStore : IScoreStore
     private HttpClient Client => _httpClient ??= new HttpClient(new SentryHttpMessageHandler());
 #endif
 
-    private async Task LoginAsync()
+    private async Task LoginAsync(CancellationToken cancellationToken)
     {
         Connection = ConnectionState.Connecting;
 
@@ -175,7 +219,7 @@ public sealed class RemoteScoreStore : IScoreStore
 #else
             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await Client.PostAsync(url, content);
+            var response = await Client.PostAsync(url, content, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 Debug.Log("Login to leaderboard successful.");
@@ -197,6 +241,12 @@ public sealed class RemoteScoreStore : IScoreStore
                 Connection = ConnectionState.Failed;
             }
 #endif
+        }
+        catch (OperationCanceledException)
+        {
+            // The scene went away mid-request. Not a failure worth reporting or drawing.
+            transaction.Finish(SpanStatus.Cancelled);
+            _jwtToken = null;
         }
         catch (Exception ex)
         {

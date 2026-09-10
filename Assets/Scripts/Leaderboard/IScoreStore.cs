@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -24,6 +25,18 @@ public interface IScoreStore : IDisposable
 
     /// <summary>What to tell the player about the backend. See <see cref="ConnectionState"/>.</summary>
     ConnectionState Connection { get; }
+
+    /// <summary>
+    /// Raised on the main thread whenever <see cref="Connection"/> changes, so the indicator
+    /// does not have to poll for it.
+    /// </summary>
+    event Action<ConnectionState> ConnectionChanged;
+
+    /// <summary>
+    /// Reaches the backend without submitting anything, so the player can be told whether a
+    /// score will go anywhere before they type a name. Does nothing for a store with no backend.
+    /// </summary>
+    Task TryConnectAsync(CancellationToken cancellationToken);
 
     /// <summary>Records one run. Returns whether it was stored; never throws for an expected failure.</summary>
     Task<bool> SubmitAsync(ScoreEntry entry);

@@ -21,6 +21,9 @@ public class ScorePoster : MonoBehaviour
     [SerializeField] private NameEntryField _nameEntry;
     [SerializeField] private Button _submitButton;
 
+    [Tooltip("Optional: the light saying whether the score has anywhere to go")]
+    [SerializeField] private ConnectionIndicator _connectionIndicator;
+
     private TextMeshProUGUI _buttonText;
 
     /// <summary>Where the score goes. Null when this mode keeps no scores at all.</summary>
@@ -91,6 +94,13 @@ public class ScorePoster : MonoBehaviour
 
         _nameEntry.SetLengthLimit(_store.NameLengthLimit);
         _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameEntry.Text);
+
+        // Starts reaching for the backend now, so the light has answered by the time a name is
+        // typed. A store with nothing to reach hides it instead.
+        if (_connectionIndicator != null)
+        {
+            _connectionIndicator.Bind(_store);
+        }
     }
 
     /// <summary>
@@ -100,6 +110,11 @@ public class ScorePoster : MonoBehaviour
     public void Hide()
     {
         _root.SetActive(false);
+
+        if (_connectionIndicator != null)
+        {
+            _connectionIndicator.Unbind();
+        }
     }
 
     private void OnNameChanged()

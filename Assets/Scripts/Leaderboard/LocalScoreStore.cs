@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Sentry.Unity;
 using UnityEngine;
@@ -50,6 +51,19 @@ public sealed class LocalScoreStore : IScoreStore
 
     /// <summary>Nothing to connect to, so the indicator stays hidden rather than showing failure.</summary>
     public ConnectionState Connection => ConnectionState.NotApplicable;
+
+    /// <summary>Never fires. This store is always in the one state it can be in.</summary>
+    public event Action<ConnectionState> ConnectionChanged
+    {
+        add { }
+        remove { }
+    }
+
+    /// <summary>Nothing to reach. Returns at once so the caller needs no special case.</summary>
+    public Task TryConnectAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 
     public Task<bool> SubmitAsync(ScoreEntry entry)
     {
