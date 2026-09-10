@@ -1,31 +1,12 @@
 using System;
-#if !UNITY_SWITCH && !UNITY_SWITCH2
-using System.Net.Http;
-#endif
 #if UNITY_STANDALONE_WIN
 using System.Runtime.InteropServices;
 #endif
 using System.Threading.Tasks;
-using Sentry;
 using Sentry.Unity;
 using TMPro;
 using UnityEngine;
-#if UNITY_SWITCH || UNITY_SWITCH2
-using UnityEngine.Networking;
-#endif
 using UnityEngine.UI;
-
-[Serializable]
-public class ScoreEntry
-{
-    public string Key;
-    public string Name;
-    public string Email;
-    public string Duration;
-    public int Score;
-    public string Timestamp;
-    public string Platform;
-}
 
 public class ScorePoster : MonoBehaviour
 {
@@ -43,13 +24,9 @@ public class ScorePoster : MonoBehaviour
     /// <summary>Raised when the on-screen keyboard closes and the name field has text.</summary>
     public event Action OnVirtualKeyboardClosedWithText;
 
-    private string _jwtToken;
-#if !UNITY_SWITCH && !UNITY_SWITCH2
-    private HttpClient _httpClient;
-#endif
+    /// <summary>Where the score goes. Null when this mode keeps no scores at all.</summary>
+    private IScoreStore _store;
 
-    // Awaited before uploading: the player can submit before login resolves.
-    private Task _loginTask;
     private bool _isUploading;
     private bool _uploadSucceeded;
 
@@ -71,6 +48,7 @@ public class ScorePoster : MonoBehaviour
     private void Awake()
     {
         _buttonText = _submitButton.GetComponentInChildren<TextMeshProUGUI>();
+        _store = CreateStore();
 
         _submitButton.onClick.AddListener(OnSubmit);
 
@@ -108,26 +86,31 @@ public class ScorePoster : MonoBehaviour
 #endif
     }
 
-    private void Start()
+    private static IScoreStore CreateStore()
     {
-        if (LeaderboardConfiguration.Mode == ScoreMode.Remote
-            && !string.IsNullOrEmpty(LeaderboardConfiguration.ApiUrl))
+        return LeaderboardConfiguration.Mode switch
         {
-#if !UNITY_SWITCH && !UNITY_SWITCH2
-            _httpClient = new HttpClient(new SentryHttpMessageHandler());
-#endif
-            _loginTask = LoginAsync();
-        }
+            ScoreMode.Remote => new RemoteScoreStore(
+                LeaderboardConfiguration.ApiUrl,
+                LeaderboardConfiguration.Credentials
+            ),
+            // Local gets its store when the on-device board lands. None never keeps anything.
+            _ => null,
+        };
     }
 
     public void Enable()
     {
-        // Nothing to upload to if the login failed.
-        if (_jwtToken != null)
+        // Whether the backend answers is not known yet and deliberately not waited for: the
+        // panel appears if there is somewhere to post to at all, and connecting happens when
+        // the player actually submits.
+        if (_store == null || !_store.CanSubmit)
         {
-            _root.SetActive(true);
-            _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameField.text);
+            return;
         }
+
+        _root.SetActive(true);
+        _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameField.text);
     }
 
     private void Update()
@@ -165,11 +148,8 @@ public class ScorePoster : MonoBehaviour
 #endif
         }
 
-#if !UNITY_SWITCH && !UNITY_SWITCH2
-        // "Try Again" reloads the scene, so this would otherwise leak per reload.
-        _httpClient?.Dispose();
-        _httpClient = null;
-#endif
+        _store?.Dispose();
+        _store = null;
     }
 
     private void OnNameValueChanged(string text)
@@ -248,101 +228,6 @@ public class ScorePoster : MonoBehaviour
     }
 #endif
 
-    private async Task LoginAsync()
-    {
-        // On the run's trace: the score being posted is the last act of the run that earned it.
-        var transaction = RunTrace.StartTransaction("scoreposter", "login");
-        RunTrace.SetScopeTransaction(transaction);
-
-        try
-        {
-            var json = JsonUtility.ToJson(LeaderboardConfiguration.Credentials);
-            var url = LeaderboardConfiguration.ApiUrl + "/token";
-
-#if UNITY_SWITCH || UNITY_SWITCH2
-            // HttpClient + SentryHttpMessageHandler do not work on Switch or Switch 2, so the request
-            // goes through UnityWebRequest and this block reproduces what the handler would have
-            // done: the http.client child span, trace-header propagation, the breadcrumb, and
-            // the failed-request event.
-            var span = transaction.StartChild("http.client", $"POST {url}");
-            span.SetExtra("http.request.method", "POST");
-            var uri = new Uri(url);
-            if (!string.IsNullOrWhiteSpace(uri.Host))
-            {
-                span.SetExtra("server.address", uri.Host);
-            }
-
-            using (var request = new UnityWebRequest(url, "POST"))
-            {
-                request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
-                SentryWebRequest.PropagateTraceHeaders(request, span);
-
-                await request.SendWebRequest();
-
-                var statusCode = (int)request.responseCode;
-                SentryWebRequest.AddHttpBreadcrumb(url, statusCode);
-                span.SetExtra("http.response.status_code", statusCode);
-                span.Finish(SentryWebRequest.GetSpanStatusFromHttpCode(statusCode));
-
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    Debug.Log("Login to leaderboard successful.");
-                    GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "ok"));
-                    transaction.Finish(SpanStatus.Ok);
-                    _jwtToken = request.downloadHandler.text.Replace("\"", "");
-                }
-                else
-                {
-                    Debug.Log("Login to leaderboard failed.");
-                    GameMetrics.Count(
-                        GameMetrics.ScoreLogin,
-                        1,
-                        (GameMetrics.ResultKey, statusCode.ToString())
-                    );
-                    SentryWebRequest.CaptureFailedRequest("POST", url, statusCode, request.error);
-                    transaction.Finish(SpanStatus.Unavailable);
-                    _jwtToken = null;
-                }
-            }
-#else
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PostAsync(url, content);
-            if (response.IsSuccessStatusCode)
-            {
-                Debug.Log("Login to leaderboard successful.");
-                GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "ok"));
-                transaction.Finish(SpanStatus.Ok);
-                _jwtToken = (await response.Content.ReadAsStringAsync()).Replace("\"", "");
-            }
-            else
-            {
-                Debug.Log("Login to leaderboard failed.");
-                GameMetrics.Count(
-                    GameMetrics.ScoreLogin,
-                    1,
-                    (GameMetrics.ResultKey, ((int)response.StatusCode).ToString())
-                );
-                transaction.Finish(SpanStatus.Unavailable);
-                _jwtToken = null;
-            }
-#endif
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Login failed: {ex.Message}");
-            GameMetrics.Count(GameMetrics.ScoreLogin, 1, (GameMetrics.ResultKey, "error"));
-            transaction.Finish(SpanStatus.InternalError);
-            _jwtToken = null;
-        }
-        finally
-        {
-            RunTrace.ClearScopeTransaction();
-        }
-    }
-
     private void OnSubmit()
     {
         // Button callbacks are synchronous, so fire-and-forget via SubmitAsync, which
@@ -375,7 +260,7 @@ public class ScorePoster : MonoBehaviour
 
         try
         {
-            _uploadSucceeded = await UploadScoreCoreAsync();
+            _uploadSucceeded = await SubmitToStoreAsync();
         }
         finally
         {
@@ -394,22 +279,18 @@ public class ScorePoster : MonoBehaviour
         }
     }
 
-    private async Task<bool> UploadScoreCoreAsync()
+    /// <summary>
+    /// Hands the run to the store and reports the outcome on the button. Everything about how
+    /// the score is kept -- connecting, retrying, where it ends up -- belongs to the store.
+    /// </summary>
+    private async Task<bool> SubmitToStoreAsync()
     {
-        if (_loginTask != null)
+        if (_store == null)
         {
-            await _loginTask;
-        }
-
-        if (string.IsNullOrEmpty(_jwtToken))
-        {
-            Debug.Log("Not uploading the score: no leaderboard session.");
-            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, "no_session"));
-            _buttonText.text = "Retry";
             return false;
         }
 
-        var score = new ScoreEntry
+        var entry = new ScoreEntry
         {
             Key = Guid.NewGuid().ToString(),
             Name = _nameField.text,
@@ -419,109 +300,8 @@ public class ScorePoster : MonoBehaviour
             Platform = Application.platform.ToString()
         };
 
-        var json = JsonUtility.ToJson(score);
-
-        var uploadTransaction = RunTrace.StartTransaction("scoreposter", "upload");
-        RunTrace.SetScopeTransaction(uploadTransaction);
-
-        // Inside the transaction, so a spike in the failure count leads straight to a trace.
-        var started = System.Diagnostics.Stopwatch.StartNew();
-        var result = "error";
-
-        try
-        {
-            var url = LeaderboardConfiguration.ApiUrl + "/score";
-
-#if UNITY_SWITCH || UNITY_SWITCH2
-            // Same manual UnityWebRequest path as LoginAsync (HttpClient does not work on
-            // Switch or Switch 2): http.client span, trace headers, breadcrumb, failed-request event.
-            var span = uploadTransaction.StartChild("http.client", $"POST {url}");
-            span.SetExtra("http.request.method", "POST");
-            var uri = new Uri(url);
-            if (!string.IsNullOrWhiteSpace(uri.Host))
-            {
-                span.SetExtra("server.address", uri.Host);
-            }
-
-            using (var request = new UnityWebRequest(url, "POST"))
-            {
-                request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
-                request.SetRequestHeader("Authorization", "Bearer " + _jwtToken);
-                SentryWebRequest.PropagateTraceHeaders(request, span);
-
-                await request.SendWebRequest();
-
-                var statusCode = (int)request.responseCode;
-                SentryWebRequest.AddHttpBreadcrumb(url, statusCode);
-                span.SetExtra("http.response.status_code", statusCode);
-                span.Finish(SentryWebRequest.GetSpanStatusFromHttpCode(statusCode));
-
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    Debug.Log("Uploading score to leaderboard failed.");
-                    SentryWebRequest.CaptureFailedRequest("POST", url, statusCode, request.error);
-                    result = statusCode.ToString();
-                    _buttonText.text = "Retry";
-                    uploadTransaction.Finish(SpanStatus.Unavailable);
-                    return false;
-                }
-
-                Debug.Log("Uploading score to leaderboard was successful.");
-                result = "ok";
-                _buttonText.text = "Posted!";
-                uploadTransaction.Finish(SpanStatus.Ok);
-                return true;
-            }
-#else
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-            // Per-request: the client is shared, so mutating its defaults is global state.
-            using var request = new HttpRequestMessage(HttpMethod.Post, url)
-            {
-                Content = content,
-            };
-            request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _jwtToken);
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Debug.Log("Uploading score to leaderboard failed.");
-                SentrySdk.CaptureException(new HttpRequestException("Failed to upload score."));
-                result = ((int)response.StatusCode).ToString();
-                _buttonText.text = "Retry";
-                uploadTransaction.Finish(SpanStatus.Unavailable);
-                return false;
-            }
-
-            Debug.Log("Uploading score to leaderboard was successful.");
-            result = "ok";
-            _buttonText.text = "Posted!";
-            uploadTransaction.Finish(SpanStatus.Ok);
-            return true;
-#endif
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Score upload failed: {ex.Message}");
-            _buttonText.text = "Retry";
-            uploadTransaction.Finish(SpanStatus.InternalError);
-            return false;
-        }
-        finally
-        {
-            GameMetrics.Count(GameMetrics.ScoreUpload, 1, (GameMetrics.ResultKey, result));
-            GameMetrics.Distribution(
-                GameMetrics.ScoreUploadDuration,
-                started.Elapsed.TotalMilliseconds,
-                MeasurementUnit.Duration.Millisecond,
-                (GameMetrics.ResultKey, result)
-            );
-
-            RunTrace.ClearScopeTransaction();
-        }
+        var stored = await _store.SubmitAsync(entry);
+        _buttonText.text = stored ? "Posted!" : "Retry";
+        return stored;
     }
 }
