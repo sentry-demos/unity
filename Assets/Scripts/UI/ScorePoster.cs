@@ -11,7 +11,6 @@ using Sentry.Unity;
 using TMPro;
 using UnityEngine;
 #if UNITY_SWITCH || UNITY_SWITCH2
-using System.Collections.Generic;
 using UnityEngine.Networking;
 #endif
 using UnityEngine.UI;
@@ -278,14 +277,14 @@ public class ScorePoster : MonoBehaviour
                 request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
-                PropagateTraceHeaders(request, span);
+                SentryWebRequest.PropagateTraceHeaders(request, span);
 
                 await request.SendWebRequest();
 
                 var statusCode = (int)request.responseCode;
-                AddHttpBreadcrumb(url, statusCode);
+                SentryWebRequest.AddHttpBreadcrumb(url, statusCode);
                 span.SetExtra("http.response.status_code", statusCode);
-                span.Finish(GetSpanStatusFromHttpCode(statusCode));
+                span.Finish(SentryWebRequest.GetSpanStatusFromHttpCode(statusCode));
 
                 if (request.result == UnityWebRequest.Result.Success)
                 {
@@ -302,7 +301,7 @@ public class ScorePoster : MonoBehaviour
                         1,
                         (GameMetrics.ResultKey, statusCode.ToString())
                     );
-                    CaptureFailedRequest("POST", url, statusCode, request.error);
+                    SentryWebRequest.CaptureFailedRequest("POST", url, statusCode, request.error);
                     transaction.Finish(SpanStatus.Unavailable);
                     _jwtToken = null;
                 }
@@ -450,19 +449,19 @@ public class ScorePoster : MonoBehaviour
                 request.downloadHandler = new DownloadHandlerBuffer();
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", "Bearer " + _jwtToken);
-                PropagateTraceHeaders(request, span);
+                SentryWebRequest.PropagateTraceHeaders(request, span);
 
                 await request.SendWebRequest();
 
                 var statusCode = (int)request.responseCode;
-                AddHttpBreadcrumb(url, statusCode);
+                SentryWebRequest.AddHttpBreadcrumb(url, statusCode);
                 span.SetExtra("http.response.status_code", statusCode);
-                span.Finish(GetSpanStatusFromHttpCode(statusCode));
+                span.Finish(SentryWebRequest.GetSpanStatusFromHttpCode(statusCode));
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
                     Debug.Log("Uploading score to leaderboard failed.");
-                    CaptureFailedRequest("POST", url, statusCode, request.error);
+                    SentryWebRequest.CaptureFailedRequest("POST", url, statusCode, request.error);
                     result = statusCode.ToString();
                     _buttonText.text = "Retry";
                     uploadTransaction.Finish(SpanStatus.Unavailable);
@@ -525,100 +524,4 @@ public class ScorePoster : MonoBehaviour
             RunTrace.ClearScopeTransaction();
         }
     }
-
-#if UNITY_SWITCH || UNITY_SWITCH2
-    /// <summary>
-    /// Propagates the sentry-trace and baggage headers to the outgoing request, so the
-    /// leaderboard backend joins the distributed trace. Mimics
-    /// SentryMessageHandler.PropagateTraceHeaders.
-    /// </summary>
-    private static void PropagateTraceHeaders(UnityWebRequest request, ISpan span)
-    {
-        var traceHeader = span?.GetTraceHeader() ?? SentrySdk.GetTraceHeader();
-        if (traceHeader != null)
-        {
-            request.SetRequestHeader("sentry-trace", traceHeader.ToString());
-        }
-
-        var baggage = SentrySdk.GetBaggage();
-        if (baggage != null)
-        {
-            request.SetRequestHeader("baggage", baggage.ToString());
-        }
-    }
-
-    /// <summary>
-    /// The breadcrumb SentryHttpMessageHandler would have left for the request.
-    /// </summary>
-    private static void AddHttpBreadcrumb(string url, int statusCode)
-    {
-        SentrySdk.AddBreadcrumb(
-            message: string.Empty,
-            category: "http",
-            type: "http",
-            data: new Dictionary<string, string>
-            {
-                { "url", url },
-                { "method", "POST" },
-                { "status_code", statusCode.ToString() },
-            }
-        );
-    }
-
-    /// <summary>
-    /// Maps HTTP status codes to span statuses. Mimics SpanStatusConverter.FromHttpStatusCode.
-    /// </summary>
-    private static SpanStatus GetSpanStatusFromHttpCode(int code)
-    {
-        return code switch
-        {
-            < 400 => SpanStatus.Ok,
-            400 => SpanStatus.FailedPrecondition,
-            401 => SpanStatus.Unauthenticated,
-            403 => SpanStatus.PermissionDenied,
-            404 => SpanStatus.NotFound,
-            409 => SpanStatus.AlreadyExists,
-            429 => SpanStatus.ResourceExhausted,
-            499 => SpanStatus.Cancelled,
-            < 500 => SpanStatus.FailedPrecondition,
-            500 => SpanStatus.InternalError,
-            501 => SpanStatus.Unimplemented,
-            503 => SpanStatus.Unavailable,
-            504 => SpanStatus.DeadlineExceeded,
-            < 600 => SpanStatus.InternalError,
-            _ => SpanStatus.UnknownError,
-        };
-    }
-
-    /// <summary>
-    /// Captures a 4xx/5xx response as an event. Mimics SentryHttpFailedRequestHandler.
-    /// </summary>
-    private static void CaptureFailedRequest(string method, string url, int statusCode, string error)
-    {
-        if (statusCode < 400)
-        {
-            return;
-        }
-
-        var exception = new System.Net.Http.HttpRequestException(
-            $"Response status code does not indicate success: {statusCode} ({error})"
-        );
-
-        var sentryEvent = new SentryEvent(exception)
-        {
-            Request = new SentryRequest
-            {
-                Url = url,
-                Method = method,
-                QueryString = new Uri(url).Query,
-            },
-        };
-        sentryEvent.Contexts["response"] = new Dictionary<string, object>
-        {
-            { "status_code", statusCode },
-        };
-
-        SentrySdk.CaptureEvent(sentryEvent);
-    }
-#endif
 }
