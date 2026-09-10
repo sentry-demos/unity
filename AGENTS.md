@@ -100,11 +100,3 @@ unity command run_tests
 - CI (`ci.yml`) gates on two things only: the formatter with `--verify-no-changes`, and player builds
   for macOS, iOS, Windows, Linux, Android. No test job — clean compile + green build is the real bar.
 - `run-demo.yml` exercises the demo-config path with the intentional faults on.
-
-## Commit attribution
-
-AI commits MUST include the agent's own identity, e.g.:
-
-```
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-```
