@@ -1,4 +1,3 @@
-using System.Collections;
 using SceneManagers;
 using TMPro;
 using UnityEngine;
@@ -56,6 +55,9 @@ public class HUD : MonoBehaviour
     [SerializeField] private GameObject _quit;
     [SerializeField] private HUDManager _hudManager;
 
+    [Tooltip("Choreographs the game-over reveal. Pause has none: it should be instant")]
+    [SerializeField] private GameOverReveal _reveal;
+
     private int _lastScore;
 
     private void Awake()
@@ -97,6 +99,7 @@ public class HUD : MonoBehaviour
 
     public void HidePause()
     {
+        _reveal.Stop();
         _overlay.SetActive(false);
 
         // Clear the highlighted button to prevent accidental clicks
@@ -108,40 +111,12 @@ public class HUD : MonoBehaviour
 
     public void ShowGameOver()
     {
-        StartCoroutine(ShowGameOverSequence());
-    }
-
-    // Staged reveal. Realtime waits, because the game-over screen runs at Time.timeScale = 0.
-    private IEnumerator ShowGameOverSequence()
-    {
-        // 1. Show "GAME OVER"
         _title.text = "GAME OVER";
         ShowOverlay(finalScore: false, choices: false);
 
-        yield return new WaitForSecondsRealtime(1.0f);
-
-        // 2. Show the final score
-        _finalScoreText.text = _lastScore.ToString();
-        _finalScoreText.gameObject.SetActive(true);
-
-        yield return new WaitForSecondsRealtime(1.0f);
-
-        // 3. Show the score poster, which stays hidden if this mode keeps no scores
-        _scorePoster.Enable(_lastScore);
-
-        yield return new WaitForSecondsRealtime(1.0f);
-
-        // 4. Show Try Again / Quit
-        _choices.SetActive(true);
-
-        yield return new WaitForSecondsRealtime(0.1f);
-
-        // Pre-select the name field so the player can immediately type / navigate with a
-        // controller.
-        if (_hudManager != null)
-        {
-            _hudManager.FocusNameField();
-        }
+        // The reveal owns the rest: what comes in, in what order, and how it moves. It also
+        // reveals the poster and takes focus, once the screen has stopped moving.
+        _reveal.Play(_lastScore);
     }
 
     /// <summary>
@@ -155,6 +130,14 @@ public class HUD : MonoBehaviour
         _finalScoreText.gameObject.SetActive(finalScore);
         _choices.SetActive(choices);
         _scorePoster.Hide();
+
+        // The reveal leaves things scaled and faded part-way through. Pause is instant, so it
+        // has to put them back rather than inherit whatever the last animation was doing.
+        _title.alpha = 1f;
+        _title.transform.localScale = Vector3.one;
+        _finalScoreText.alpha = 1f;
+        _finalScoreText.transform.localScale = Vector3.one;
+        _choices.transform.localScale = Vector3.one;
     }
 
     /// <summary>Marks a timed pickup effect as running, with the icon it was collected as.</summary>

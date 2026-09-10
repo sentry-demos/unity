@@ -810,8 +810,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 2
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -1204,6 +1204,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 502204858}
+  - component: {fileID: 502204859}
   m_Layer: 5
   m_Name: Panel
   m_TagString: Untagged
@@ -1232,6 +1233,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &502204859
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 502204857}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &527090876
 GameObject:
   m_ObjectHideFlags: 0
@@ -7930,6 +7943,7 @@ GameObject:
   - component: {fileID: 715298355}
   - component: {fileID: 715298359}
   - component: {fileID: 715298360}
+  - component: {fileID: 715298361}
   m_Layer: 5
   m_Name: HUD
   m_TagString: Untagged
@@ -8056,6 +8070,7 @@ MonoBehaviour:
   _tryAgain: {fileID: 1730555519}
   _quit: {fileID: 170557571}
   _hudManager: {fileID: 715298360}
+  _reveal: {fileID: 715298361}
 --- !u!114 &715298360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8072,6 +8087,36 @@ MonoBehaviour:
   quitButton: {fileID: 170557571}
   _nameEntry: {fileID: 1703730792}
   _submitButton: {fileID: 856302572}
+--- !u!114 &715298361
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 715298354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf34b6c49f2b14a1c8f28c8273bd6a33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Sentaur.Runtime::GameOverReveal
+  _dim: {fileID: 1155010743}
+  _title: {fileID: 1932945648}
+  _score: {fileID: 1693517684}
+  _panel: {fileID: 502204859}
+  _choices: {fileID: 1304603706}
+  _scorePoster: {fileID: 1394716927}
+  _hudManager: {fileID: 715298360}
+  _dimFade: 0.22
+  _titleIn: 0.38
+  _scoreIn: 0.34
+  _countUp: 0.6
+  _panelIn: 0.3
+  _choicesIn: 0.24
+  _titleFromScale: 0.55
+  _scoreFromScale: 1.8
+  _panelRise: 45
+  _scorePunch: 0.35
+  _choiceStagger: 0.07
 --- !u!1001 &719918155
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11563,6 +11608,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1304603705}
+  - component: {fileID: 1304603706}
   m_Layer: 0
   m_Name: Choices
   m_TagString: Untagged
@@ -11591,6 +11637,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &1304603706
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1304603704}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!4 &1306705493 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3600334310735166755, guid: ce6ca319e4496403782aea5ae869c333, type: 3}
@@ -33064,11 +33122,11 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 599605930}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 1}
-  m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 381, y: -480}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 28, y: 28}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 1, y: 1}
 --- !u!114 &1565766204
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -34459,8 +34517,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
