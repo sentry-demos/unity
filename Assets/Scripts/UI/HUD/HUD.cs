@@ -22,6 +22,12 @@ public class HUD : MonoBehaviour
     [SerializeField] private GameObject _quit;
     [SerializeField] private HUDManager _hudManager;
 
+    [Tooltip("The level up UI prefab to show when a level is reached")]
+    [SerializeField] private GameObject _levelUpUI;
+
+    [Tooltip("The parent UI element containing the active pickups")]
+    [SerializeField] private ActivePickupsUI _activePickupsUI;
+
     private int _lastScore;
 
     private XpBar _xpBar;
@@ -131,4 +137,22 @@ public class HUD : MonoBehaviour
     {
         _currentLevelText.text = "Level " + (level + 1);
     }
+
+    /// <summary>Marks a timed pickup effect as running, with the icon it was collected as.</summary>
+    public void AddActivePickup(Sprite icon, float duration)
+    {
+        _activePickupsUI.Add(icon, duration);
+    }
+
+    /// <summary>Offers the level-up choice. The panel pauses the game itself while it is open.</summary>
+    public void ShowLevelUp()
+    {
+        _levelUpUI.SetActive(true);
+    }
+
+    /// <summary>
+    /// Whether the level-up choice is up. The battle manager asks so that pausing on top of it
+    /// is refused; that panel has already stopped the clock.
+    /// </summary>
+    public bool IsLevelUpOpen => _levelUpUI.activeSelf;
 }

@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 # The markers the demo run is verified against. These are the contract between the
 # game and CI: if the log lines below change in Assets/Scripts, these change too.
 $script:GameplayMarker = 'Start Game'                            # TitleSceneManager.cs
-$script:NativeCrashMarker = 'Attempting save_score_to_disk'      # BattleSceneManager.cs
+$script:NativeCrashMarker = 'Attempting save_score_to_disk'      # NativeScoreSaver.cs
 
 # Logged immediately after the native call in BattleSceneManager.SaveScoreToDisk.
 # The crash is meant to take the process down, so any of these appearing means it

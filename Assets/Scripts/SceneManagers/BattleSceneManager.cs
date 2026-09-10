@@ -1,6 +1,3 @@
-using System;
-using System.Runtime.InteropServices;
-using Sentry.Unity;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -20,15 +17,7 @@ public class BattleSceneManager : MonoBehaviour
     private float _xp = 0;
 
     [SerializeField]
-    [Tooltip("The level up UI prefab to spawn")]
-    private GameObject _levelUpUI;
-
-    [SerializeField]
-    [Tooltip("The parent UI element containing the active pickups")]
-    private ActivePickupsUI _activePickupsUI;
-
-    [SerializeField]
-    [Tooltip("The HUD for this scene")]
+    [Tooltip("The HUD for this scene; every other UI element hangs off it")]
     private HUD _hud;
 
     [Header("Components")]
@@ -71,22 +60,6 @@ public class BattleSceneManager : MonoBehaviour
     private float _gameStartTime;
     private bool _isDeathEnemyPresent = false;
 
-    // Intentional crash: enter the d-pad sequence Up Up Down Down Left Right Left Right in
-    // order. A wrong direction or a pause longer than CrashSeqTimeout resets progress.
-    // Deliberately obscure so it can't be hit by accident; routes through the same crash
-    // path as CrashOnGameOver (SaveScoreToDisk) for the same clean, named native frame.
-    // Armed by DemoConfiguration.KonamiCrash, which is on by default and deliberately not
-    // covered by the master switch -- see the remarks on that property.
-    private const float CrashSeqTimeout = 2f;
-    private InputAction _crashSeqUp;
-    private InputAction _crashSeqDown;
-    private InputAction _crashSeqLeft;
-    private InputAction _crashSeqRight;
-    // Direction codes: 0 = Up, 1 = Down, 2 = Left, 3 = Right
-    private static readonly int[] CrashSequence = { 0, 0, 1, 1, 2, 3, 2, 3 };
-    private int _crashSeqIndex = 0;
-    private float _crashSeqLastInputTime = 0f;
-
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
@@ -128,76 +101,6 @@ public class BattleSceneManager : MonoBehaviour
         _metrics.RunStarted(Time.time, _progression.CurrentLevel);
 
         _hud.SetCurrentLevel(_progression.CurrentLevel);
-
-        // The actual crash is fired from Update() once the d-pad crash sequence is entered
-        // (see CrashSequence / CheckForceCrash). Missing actions just disable the trigger.
-        _crashSeqUp = InputSystem.actions.FindAction("CrashSeqUp");
-        _crashSeqDown = InputSystem.actions.FindAction("CrashSeqDown");
-        _crashSeqLeft = InputSystem.actions.FindAction("CrashSeqLeft");
-        _crashSeqRight = InputSystem.actions.FindAction("CrashSeqRight");
-        _crashSeqIndex = 0;
-    }
-
-    // Intentional crash trigger. Fires only after the exact d-pad sequence Up Up Down Down
-    // Left Right Left Right is entered in order (a wrong direction or a pause > CrashSeqTimeout
-    // resets), so it can't be hit by accident. NOTE: like CrashOnGameOver, this only crashes in
-    // a player build; in the Editor SaveScoreToDisk just logs.
-    private void CheckForceCrash()
-    {
-        // No config asset at all leaves the sequence armed: that is how it ships, and it is
-        // what a console build depends on.
-        if (_demoConfig != null && !_demoConfig.KonamiCrash)
-        {
-            return;
-        }
-
-        var pressed = -1;
-        var pressedCount = 0;
-        if (_crashSeqUp != null && _crashSeqUp.WasPressedThisFrame())
-        { pressed = 0; pressedCount++; }
-        if (_crashSeqDown != null && _crashSeqDown.WasPressedThisFrame())
-        { pressed = 1; pressedCount++; }
-        if (_crashSeqLeft != null && _crashSeqLeft.WasPressedThisFrame())
-        { pressed = 2; pressedCount++; }
-        if (_crashSeqRight != null && _crashSeqRight.WasPressedThisFrame())
-        { pressed = 3; pressedCount++; }
-
-        if (pressedCount == 0)
-        {
-            return;
-        }
-
-        // More than one direction in the same frame (e.g. a diagonal) - treat as a miss and
-        // start over.
-        if (pressedCount > 1)
-        {
-            _crashSeqIndex = 0;
-            return;
-        }
-
-        // Reset progress if the player paused too long since the last input.
-        if (Time.unscaledTime - _crashSeqLastInputTime > CrashSeqTimeout)
-        {
-            _crashSeqIndex = 0;
-        }
-        _crashSeqLastInputTime = Time.unscaledTime;
-
-        if (pressed == CrashSequence[_crashSeqIndex])
-        {
-            _crashSeqIndex++;
-            if (_crashSeqIndex >= CrashSequence.Length)
-            {
-                Debug.Log("ForceCrash triggered via d-pad sequence.");
-                _crashSeqIndex = 0;
-                SaveScoreToDisk();
-            }
-        }
-        else
-        {
-            // Wrong direction: reset, but let this press start a fresh attempt if it happens
-            // to be the first input of the sequence.
-            _crashSeqIndex = (pressed == CrashSequence[0]) ? 1 : 0;
-        }
     }
 
     // GameEvents is static, so subscriptions outlive the scene. "Try Again" reloads
@@ -230,7 +133,7 @@ public class BattleSceneManager : MonoBehaviour
         // active effects get denoted in the UI
         if (pickup.EffectDuration > 0)
         {
-            _activePickupsUI.Add(pickup.Icon, pickup.EffectDuration);
+            _hud.AddActivePickup(pickup.Icon, pickup.EffectDuration);
         }
     }
 
@@ -321,44 +224,9 @@ public class BattleSceneManager : MonoBehaviour
         if (_demoConfig != null && _demoConfig.CrashOnGameOver)
         {
             Debug.Log("Saving score to disk.");
-            SaveScoreToDisk();
+            NativeScoreSaver.SaveScoreToDisk(_score);
         }
     }
-
-    // INTENTIONAL: save_score_to_disk crashes on purpose, to demo native crash capture.
-    // Gated on DemoConfiguration.CrashOnGameOver. See CONTRIBUTING.md.
-    private void SaveScoreToDisk()
-    {
-        // Emitted and flushed before the process goes away, so the metric arrives even
-        // though nothing after the native call ever runs.
-        GameMetrics.Count(GameMetrics.RunCrashPathEntered, 1);
-        SentrySdk.Flush(TimeSpan.FromSeconds(2));
-
-#if !UNITY_EDITOR
-        Debug.Log("Calling into Native Save Utils.");
-
-        // The log lines below are mirrored in .github/scripts/lib/DemoRun.psm1: they are how
-        // the demo run tells a real crash from one the process survived.
-        try
-        {
-            Debug.Log("Attempting save_score_to_disk...");
-            save_score_to_disk(_score);
-            Debug.Log("save_score_to_disk completed without crash - this should not happen!");
-        }
-        catch (System.Exception e)
-        {
-            Debug.Log("save_score_to_disk threw exception: " + e.Message);
-        }
-
-        Debug.Log("ForceCrash also failed - this should not be reached!");
-#else
-        Debug.Log("If this was not the Editor, the score would be saved 'natively'.");
-#endif
-    }
-
-    // NativeSaver.c
-    [DllImport("__Internal")]
-    private static extern void save_score_to_disk(int score);
 
     private void SetScore(int score)
     {
@@ -386,7 +254,7 @@ public class BattleSceneManager : MonoBehaviour
         }
 
         // Don't allow pausing if the level up UI is active (it already pauses the game)
-        if (_levelUpUI.activeSelf)
+        if (_hud.IsLevelUpOpen)
         {
             return;
         }
@@ -404,10 +272,6 @@ public class BattleSceneManager : MonoBehaviour
     // Update is called once per frame
     private void Update()
     {
-        // Checked before the playing-state gate so the crash demo also works while paused or
-        // on the game-over screen.
-        CheckForceCrash();
-
         if (_gameState != GameState.Playing)
         {
             return;
@@ -489,7 +353,7 @@ public class BattleSceneManager : MonoBehaviour
             // reset xp bar to 0 after leveling up
             _hud.SetXp(0);
 
-            _levelUpUI.SetActive(true);
+            _hud.ShowLevelUp();
         }
     }
 }

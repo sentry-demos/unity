@@ -8009,6 +8009,8 @@ MonoBehaviour:
   _tryAgain: {fileID: 1730555519}
   _quit: {fileID: 170557571}
   _hudManager: {fileID: 715298360}
+  _levelUpUI: {fileID: 3736684284675310825}
+  _activePickupsUI: {fileID: 1213143406}
 --- !u!114 &715298360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11528,6 +11530,7 @@ GameObject:
   - component: {fileID: 1361049655}
   - component: {fileID: 1361049659}
   - component: {fileID: 1361049660}
+  - component: {fileID: 1361049661}
   m_Layer: 0
   m_Name: BattleSceneManager
   m_TagString: Untagged
@@ -11550,8 +11553,6 @@ MonoBehaviour:
   _tuning: {fileID: 11400000, guid: 2d37ea633b3bd4e5993cd7bd26b0476d, type: 2}
   _currentLevel: 0
   _xp: 0
-  _levelUpUI: {fileID: 3736684284675310825}
-  _activePickupsUI: {fileID: 1213143406}
   _hud: {fileID: 715298359}
   _enemySpawner: {fileID: 1361049658}
   _pickupSpawner: {fileID: 1361049656}
@@ -11755,6 +11756,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &1361049661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1361049652}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30b1332b74acf47ccb884802ab91a633, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Sentaur.Runtime::ForceCrashSequence
+  _battle: {fileID: 1361049653}
 --- !u!1 &1379408347
 GameObject:
   m_ObjectHideFlags: 0
