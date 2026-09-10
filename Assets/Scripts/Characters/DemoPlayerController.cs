@@ -20,6 +20,12 @@ namespace Characters
         [Tooltip("Parent transform holding the XP drops")]
         private Transform _xpDropsTransform;
 
+        /// <summary>
+        /// Name of the synthetic pad this drives the player with. The UI checks for it so a
+        /// demo run cannot navigate menus while it plays.
+        /// </summary>
+        public const string VirtualGamepadName = "DemoAutoPlayGamepad";
+
         private Dart _dart;
         private Gamepad _virtualGamepad;
 
@@ -30,7 +36,7 @@ namespace Characters
 
         private void OnEnable()
         {
-            _virtualGamepad = InputSystem.AddDevice<Gamepad>("DemoAutoPlayGamepad");
+            _virtualGamepad = InputSystem.AddDevice<Gamepad>(VirtualGamepadName);
         }
 
         private void OnDisable()

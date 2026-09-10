@@ -72,6 +72,29 @@ public class HUD : MonoBehaviour
         _quit.GetComponent<Button>().onClick.AddListener(GameEvents.RaiseQuit);
     }
 
+    // GameEvents is static, so a listener that never unsubscribes stays registered across the
+    // scene reload that every run does.
+    private void OnEnable()
+    {
+        GameEvents.ScoreSubmitted += OnScoreSubmitted;
+    }
+
+    private void OnDisable()
+    {
+        GameEvents.ScoreSubmitted -= OnScoreSubmitted;
+    }
+
+    /// <summary>
+    /// The board has taken the screen. The title and the score step aside for it: the run they
+    /// belonged to is recorded, and its number is the highlighted row. Leaving them up pushed
+    /// the board down the screen and left it looking like it had fallen to the bottom.
+    /// </summary>
+    private void OnScoreSubmitted(string key)
+    {
+        _title.gameObject.SetActive(false);
+        _finalScoreText.gameObject.SetActive(false);
+    }
+
     private void Update()
     {
         // get time elapsed since game start in mm:ss format

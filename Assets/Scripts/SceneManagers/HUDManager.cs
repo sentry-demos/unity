@@ -1,3 +1,4 @@
+using Characters;
 using DG.Tweening;
 using UI;
 using UnityEngine;
@@ -105,9 +106,24 @@ namespace SceneManagers
             _submitColorTween?.Kill();
         }
 
+        /// <summary>
+        /// Whether this came from the pad the demo run drives itself with.
+        /// </summary>
+        /// <remarks>
+        /// During a demo run both action maps are live: the synthetic pad needs the Player map,
+        /// and a watching human needs the UI map to press Again. Without this the demo's own
+        /// stick also worked the menu, and the highlight hopped between Again and Quit on its
+        /// own while nobody was touching anything.
+        /// </remarks>
+        private static bool IsDemoInput(InputAction.CallbackContext context)
+        {
+            var device = context.control?.device;
+            return device != null && device.name == DemoPlayerController.VirtualGamepadName;
+        }
+
         private void OnSubmitPerformed(InputAction.CallbackContext context)
         {
-            if (!gameObject.activeSelf)
+            if (!gameObject.activeSelf || IsDemoInput(context))
             {
                 return;
             }
@@ -155,7 +171,7 @@ namespace SceneManagers
 
         private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
-            if (!gameObject.activeSelf)
+            if (!gameObject.activeSelf || IsDemoInput(context))
             {
                 return;
             }

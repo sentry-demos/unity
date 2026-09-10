@@ -23,6 +23,24 @@ public static class AttractMode
     public static bool Active;
 
     /// <summary>
+    /// Clears the flags when play begins.
+    /// </summary>
+    /// <remarks>
+    /// A build starts a fresh process every time, so these are already false. The Editor is not
+    /// a fresh process: statics outlive leaving play mode, and with domain reload turned off
+    /// they outlive entering it too. Without this, stopping during a demo run means the next
+    /// press of play starts in one.
+    /// </remarks>
+    [UnityEngine.RuntimeInitializeOnLoadMethod(
+        UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration
+    )]
+    private static void ResetOnPlay()
+    {
+        Active = false;
+        JustPosted = null;
+    }
+
+    /// <summary>
     /// The run just recorded, so the board can still pick it out after the reload that starts
     /// the demo. Null once a real run begins.
     /// </summary>
