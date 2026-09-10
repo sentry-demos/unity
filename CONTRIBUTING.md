@@ -56,7 +56,18 @@ local scores need no configuration, remote scores need it by definition. Two rul
   without the asset and makes the referencing scene or prefab churn depending on who opened it.
 
 Anything in that asset ships inside the player build and is extractable from it, so keep the
-leaderboard account throwaway.
+leaderboard account throwaway. That also means a build made on a machine with credentials
+carries them: build for a kiosk from a machine set up for it, not the other way round.
+
+### Setting up a new machine
+
+Nothing to do, if local scores are what you want. No asset means `Local`, so the on-device
+board and the demo run behind it work on a fresh clone with no setup.
+
+For a machine that should post to the backend, **Sentaur → Leaderboard Config** creates the
+asset at the right path, set to `Local` with the URL and login blank. Fill those in by hand;
+they are not in the repo and are not meant to be. The menu item selects the existing asset
+instead of overwriting it if there already is one.
 
 ## Coding Style
 
