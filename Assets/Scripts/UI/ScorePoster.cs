@@ -65,7 +65,8 @@ public class ScorePoster : MonoBehaviour
                 LeaderboardConfiguration.ApiUrl,
                 LeaderboardConfiguration.Credentials
             ),
-            // Local gets its store when the on-device board lands. None never keeps anything.
+            ScoreMode.Local => new LocalScoreStore(),
+            // None never keeps anything, so there is nothing to show a panel for.
             _ => null,
         };
     }

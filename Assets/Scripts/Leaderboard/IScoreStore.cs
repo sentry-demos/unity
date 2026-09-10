@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -26,4 +27,10 @@ public interface IScoreStore : IDisposable
 
     /// <summary>Records one run. Returns whether it was stored; never throws for an expected failure.</summary>
     Task<bool> SubmitAsync(ScoreEntry entry);
+
+    /// <summary>
+    /// The best runs this store knows about, highest first, at most <paramref name="count"/> of
+    /// them. Empty rather than throwing when there is nothing to read.
+    /// </summary>
+    Task<IReadOnlyList<ScoreEntry>> TopAsync(int count);
 }

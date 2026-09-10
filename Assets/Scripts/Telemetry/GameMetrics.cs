@@ -88,6 +88,10 @@ public static class GameMetrics
     public const string BundleDownload = Prefix + "bundle.download";
     public const string BundleDownloadDuration = Prefix + "bundle.download_duration";
 
+    // The on-device score board. Not a demo fault: this is a real feature that has to work.
+    public const string ScoreSaved = Prefix + "score.saved";
+    public const string ScoreBoardUnreadable = Prefix + "score.board_unreadable";
+
     // Attribute keys, so a typo cannot split one metric across two attribute names.
     public const string LevelKey = "level";
     public const string PlatformKey = "platform";

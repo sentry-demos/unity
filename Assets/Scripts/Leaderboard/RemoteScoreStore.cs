@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 #if !UNITY_SWITCH && !UNITY_SWITCH2
 using System.Net.Http;
 #endif
@@ -67,6 +68,15 @@ public sealed class RemoteScoreStore : IScoreStore
         }
 
         return await UploadAsync(entry);
+    }
+
+    /// <summary>
+    /// Always empty. The backend has no read endpoint: its board is displayed on the web, not
+    /// in the game. Reads exist on the interface for the on-device board.
+    /// </summary>
+    public Task<IReadOnlyList<ScoreEntry>> TopAsync(int count)
+    {
+        return Task.FromResult<IReadOnlyList<ScoreEntry>>(Array.Empty<ScoreEntry>());
     }
 
     public void Dispose()
