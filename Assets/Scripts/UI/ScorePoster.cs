@@ -93,6 +93,15 @@ public class ScorePoster : MonoBehaviour
         _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameEntry.Text);
     }
 
+    /// <summary>
+    /// Puts the panel away. The overlay is shared with the pause screen, so it has to be able
+    /// to say what is not showing as well as what is.
+    /// </summary>
+    public void Hide()
+    {
+        _root.SetActive(false);
+    }
+
     private void OnNameChanged()
     {
         if (_uploadSucceeded || _isUploading)

@@ -1,52 +1,67 @@
 using System.Collections;
-using System.Runtime.InteropServices;
 using SceneManagers;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-/**
- * Heads-up display (HUD) for the game.
- */
+/// <summary>
+/// Heads-up display (HUD) for the game, and the one way anything reaches its elements.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Two things sit on top of the game: the pause screen and the game-over screen. They are the
+/// same overlay, differing only in what its title says and which of its children are shown.
+/// </para>
+/// <para>
+/// One rule holds throughout: things appear and disappear with <c>SetActive</c>, never by
+/// switching a component off. Mixing the two left elements that were live objects with a
+/// disabled renderer sitting beside elements that were properly inactive, which read as the
+/// same thing in the game and completely differently in the hierarchy.
+/// </para>
+/// <para>
+/// Every element is a serialized reference. Finding them by name at runtime meant a rename or a
+/// reparent failed as a null reference mid-run, with nothing to catch it beforehand.
+/// </para>
+/// </remarks>
 public class HUD : MonoBehaviour
 {
-    private TextMeshProUGUI _scoreText;
-    private TextMeshProUGUI _timeElapsedText;
-    private TextMeshProUGUI _gameOverText;
-    private TextMeshProUGUI _currentLevelText;
-
-    [SerializeField] private ScorePoster _scorePoster;
-    [Tooltip("Optional: shows the final score during the game-over reveal")]
-    [SerializeField] private TextMeshProUGUI _gameOverScoreText;
-    [SerializeField] private GameObject _tryAgain;
-    [SerializeField] private GameObject _quit;
-    [SerializeField] private HUDManager _hudManager;
-
-    [Tooltip("The level up UI prefab to show when a level is reached")]
-    [SerializeField] private GameObject _levelUpUI;
+    [Header("Gameplay")]
+    [SerializeField] private TextMeshProUGUI _scoreText;
+    [SerializeField] private TextMeshProUGUI _timeElapsedText;
+    [SerializeField] private TextMeshProUGUI _currentLevelText;
+    [SerializeField] private XpBar _xpBar;
 
     [Tooltip("The parent UI element containing the active pickups")]
     [SerializeField] private ActivePickupsUI _activePickupsUI;
 
-    private int _lastScore;
+    [Tooltip("The level up UI prefab to show when a level is reached")]
+    [SerializeField] private GameObject _levelUpUI;
 
-    private XpBar _xpBar;
+    [Header("Overlay")]
+    [Tooltip("Everything that covers the game: shown for pause and for game over alike")]
+    [SerializeField] private GameObject _overlay;
+
+    [Tooltip("PAUSED or GAME OVER. A leaf, never a parent")]
+    [SerializeField] private TextMeshProUGUI _title;
+
+    [Tooltip("The final score, shown partway through the game-over reveal")]
+    [SerializeField] private TextMeshProUGUI _finalScoreText;
+
+    [SerializeField] private ScorePoster _scorePoster;
+
+    [Tooltip("Try Again and Quit, shown together")]
+    [SerializeField] private GameObject _choices;
+
+    [SerializeField] private GameObject _tryAgain;
+    [SerializeField] private GameObject _quit;
+    [SerializeField] private HUDManager _hudManager;
+
+    private int _lastScore;
 
     private void Awake()
     {
-        // get score text component from child
-        _scoreText = transform.Find("Score").GetComponent<TextMeshProUGUI>();
-        _timeElapsedText = transform.Find("TimeElapsed").GetComponent<TextMeshProUGUI>();
-        _gameOverText = transform.Find("GameOver").GetComponent<TextMeshProUGUI>();
-        _currentLevelText = transform.Find("XpBar").GetComponentInChildren<TextMeshProUGUI>();
-
-        _xpBar = transform.Find("XpBar").GetComponent<XpBar>();
-
-        var tryAgainButton = _tryAgain.GetComponent<Button>();
-        tryAgainButton.onClick.AddListener(GameEvents.RaiseTryAgain);
-
-        var quitButton = _quit.GetComponent<Button>();
-        quitButton.onClick.AddListener(GameEvents.RaiseQuit);
+        _tryAgain.GetComponent<Button>().onClick.AddListener(GameEvents.RaiseTryAgain);
+        _quit.GetComponent<Button>().onClick.AddListener(GameEvents.RaiseQuit);
     }
 
     private void Update()
@@ -69,20 +84,20 @@ public class HUD : MonoBehaviour
         _xpBar.SetXp(xp);
     }
 
+    public void SetCurrentLevel(int level)
+    {
+        _currentLevelText.text = "Level " + (level + 1);
+    }
+
     public void ShowPause()
     {
-        _gameOverText.text = "PAUSED";
-        _gameOverText.enabled = true;
-
-        _tryAgain.SetActive(true);
-        _quit.SetActive(true);
+        _title.text = "PAUSED";
+        ShowOverlay(finalScore: false, choices: true);
     }
 
     public void HidePause()
     {
-        _gameOverText.enabled = false;
-        _tryAgain.SetActive(false);
-        _quit.SetActive(false);
+        _overlay.SetActive(false);
 
         // Clear the highlighted button to prevent accidental clicks
         if (_hudManager != null)
@@ -100,28 +115,24 @@ public class HUD : MonoBehaviour
     private IEnumerator ShowGameOverSequence()
     {
         // 1. Show "GAME OVER"
-        _gameOverText.text = "GAME OVER";
-        _gameOverText.enabled = true;
+        _title.text = "GAME OVER";
+        ShowOverlay(finalScore: false, choices: false);
 
         yield return new WaitForSecondsRealtime(1.0f);
 
-        // 2. Show the final score (optional, skipped when not wired in the scene)
-        if (_gameOverScoreText != null)
-        {
-            _gameOverScoreText.text = _lastScore.ToString();
-            _gameOverScoreText.enabled = true;
-        }
+        // 2. Show the final score
+        _finalScoreText.text = _lastScore.ToString();
+        _finalScoreText.gameObject.SetActive(true);
 
         yield return new WaitForSecondsRealtime(1.0f);
 
-        // 3. Show the score poster
+        // 3. Show the score poster, which stays hidden if this mode keeps no scores
         _scorePoster.Enable(_lastScore);
 
         yield return new WaitForSecondsRealtime(1.0f);
 
         // 4. Show Try Again / Quit
-        _tryAgain.SetActive(true);
-        _quit.SetActive(true);
+        _choices.SetActive(true);
 
         yield return new WaitForSecondsRealtime(0.1f);
 
@@ -133,9 +144,17 @@ public class HUD : MonoBehaviour
         }
     }
 
-    public void SetCurrentLevel(int level)
+    /// <summary>
+    /// Puts the overlay up with a known set of children showing, so neither screen can inherit
+    /// leftovers from the other.
+    /// </summary>
+    private void ShowOverlay(bool finalScore, bool choices)
     {
-        _currentLevelText.text = "Level " + (level + 1);
+        _overlay.SetActive(true);
+        _title.gameObject.SetActive(true);
+        _finalScoreText.gameObject.SetActive(finalScore);
+        _choices.SetActive(choices);
+        _scorePoster.Hide();
     }
 
     /// <summary>Marks a timed pickup effect as running, with the icon it was collected as.</summary>
