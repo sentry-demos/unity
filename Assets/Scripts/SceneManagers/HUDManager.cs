@@ -28,6 +28,14 @@ namespace SceneManagers
         // integration), so the scale bounce is tweened directly instead.
         private Tween _nameFieldTween;
 
+        [Tooltip(
+            "How much the name field swells when navigation lands on it. It is far wider than "
+                + "a button, so this wants to be much gentler than the Highlighter's bounce"
+        )]
+        [SerializeField] private float _nameFieldBounce = 1.06f;
+
+        [SerializeField] private float _nameFieldBounceTime = 0.12f;
+
         // Direct color tween for the submit button - mirrors the name field approach because
         // a Highlighter added at runtime doesn't reliably run DoStateTransition when the
         // button's parent was inactive at AddComponent time.
@@ -271,7 +279,12 @@ namespace SceneManagers
             }
         }
 
-        public void FocusNameField()
+        /// <summary>
+        /// Gives the name field typing focus. <paramref name="announce"/> plays the bounce that
+        /// says navigation landed here; pass false when something else already drew the eye,
+        /// such as the game-over reveal, where it reads as a stray pop after everything settles.
+        /// </summary>
+        public void FocusNameField(bool announce = true)
         {
             if (_nameEntry == null || !_nameEntry.CanEdit)
             {
@@ -281,10 +294,16 @@ namespace SceneManagers
             // Activate so the player can type immediately (opens the on-screen keyboard on
             // touch platforms; focuses the field for physical keyboard input on PC).
             _nameEntry.Focus();
+
+            if (!announce)
+            {
+                return;
+            }
+
             // Animate directly via DOTween - see the field comment for why not OnPointerEnter.
             _nameFieldTween?.Kill();
             _nameFieldTween = _nameEntry.transform
-                .DOScale(1.5f, 0.1f)
+                .DOScale(_nameFieldBounce, _nameFieldBounceTime)
                 .SetLoops(2, LoopType.Yoyo)
                 .SetEase(Ease.InSine)
                 .SetUpdate(true) // runs during Time.timeScale = 0

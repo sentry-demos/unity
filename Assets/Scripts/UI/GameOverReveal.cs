@@ -140,7 +140,9 @@ public class GameOverReveal : MonoBehaviour
         {
             if (_hudManager != null)
             {
-                _hudManager.FocusNameField();
+                // Quietly: the reveal has just walked the eye down the screen, and the caret
+                // and keyboard are announcement enough. The bounce is for navigating back here.
+                _hudManager.FocusNameField(announce: false);
             }
         });
     }
