@@ -64,8 +64,10 @@ public class GameOverReveal : MonoBehaviour
     [Tooltip("Gap between the two buttons arriving")]
     [SerializeField] private float _choiceStagger = 0.07f;
 
+    [Tooltip("How dark the backdrop gets. Attract mode uses a lighter one so the demo run shows")]
+    [SerializeField] private float _dimAlpha = 0.85f;
+
     private Sequence _sequence;
-    private float _dimAlpha = 1f;
     private Vector3 _panelHome;
     private bool _homeCaptured;
 
@@ -169,7 +171,6 @@ public class GameOverReveal : MonoBehaviour
 
         _homeCaptured = true;
         _panelHome = _panel.transform.localPosition;
-        _dimAlpha = _dim != null ? _dim.color.a : 1f;
     }
 
     private void SetDimAlpha(float alpha)

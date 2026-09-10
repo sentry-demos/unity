@@ -58,6 +58,12 @@ public class HUD : MonoBehaviour
     [Tooltip("Choreographs the game-over reveal. Pause has none: it should be instant")]
     [SerializeField] private GameOverReveal _reveal;
 
+    [Tooltip("The backdrop, dimmed less during a demo run so the game behind stays watchable")]
+    [SerializeField] private Image _dim;
+
+    [Range(0f, 1f)]
+    [SerializeField] private float _attractDim = 0.5f;
+
     private int _lastScore;
 
     private void Awake()
@@ -107,6 +113,36 @@ public class HUD : MonoBehaviour
         {
             _hudManager.ClearHighlightedButton();
         }
+    }
+
+    /// <summary>
+    /// The board with the game playing itself behind it. No title and no score: the run those
+    /// belonged to is over, and this one is nobody's.
+    /// </summary>
+    public void ShowAttract(string justPostedKey)
+    {
+        _overlay.SetActive(true);
+        _title.gameObject.SetActive(false);
+        _finalScoreText.gameObject.SetActive(false);
+        _choices.SetActive(true);
+        _choices.transform.localScale = Vector3.one;
+
+        // Lighter than the game-over backdrop, because the point is to watch what is behind it.
+        SetDimAlpha(_attractDim);
+
+        _scorePoster.ShowBoardOnly(justPostedKey);
+    }
+
+    private void SetDimAlpha(float alpha)
+    {
+        if (_dim == null)
+        {
+            return;
+        }
+
+        var c = _dim.color;
+        c.a = alpha;
+        _dim.color = c;
     }
 
     public void ShowGameOver()

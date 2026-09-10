@@ -54,7 +54,9 @@ namespace Characters
 
         private void Update()
         {
-            if (_demoConfig != null && _demoConfig.AutoPlay)
+            // Two reasons to play itself: the demo config's AutoPlay fault, and the attract run
+            // that follows a recorded score. The second is a real feature and is not gated.
+            if (AttractMode.Active || (_demoConfig != null && _demoConfig.AutoPlay))
             {
                 HandleMovement();
                 HandleShooting();

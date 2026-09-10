@@ -42,6 +42,9 @@ public static class GameEvents
     public static event Action TryAgain;
     public static event Action Quit;
 
+    /// <summary>A run was recorded, carrying its key so the board can pick it out.</summary>
+    public static event Action<string> ScoreSubmitted;
+
     public static void RaiseEnemyDestroyed(int scoreValue) => EnemyDestroyed?.Invoke(scoreValue);
 
     public static void RaisePickupGrabbed(PickupCollected pickup) => PickupGrabbed?.Invoke(pickup);
@@ -53,4 +56,6 @@ public static class GameEvents
     public static void RaiseTryAgain() => TryAgain?.Invoke();
 
     public static void RaiseQuit() => Quit?.Invoke();
+
+    public static void RaiseScoreSubmitted(string key) => ScoreSubmitted?.Invoke(key);
 }

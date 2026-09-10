@@ -33,6 +33,10 @@ public class BattleSceneManager : MonoBehaviour
     [Tooltip("Background music, started and stopped with the game state")]
     private BattleAudioManager _audio;
 
+    [SerializeField]
+    [Tooltip("How long the board sits still before the demo run starts behind it")]
+    private float _attractDelay = 1.6f;
+
     private DemoConfiguration _demoConfig;
 
     // the player's accumulated score so far
@@ -98,9 +102,32 @@ public class BattleSceneManager : MonoBehaviour
         _spawnDirector.Start(Time.time);
         _gameStartTime = Time.time;
 
-        _metrics.RunStarted(Time.time, _progression.CurrentLevel);
+        // A demo run is nobody's run. Counting it would put attract loops in with the runs
+        // people actually played, and every one of them would start a trace of its own.
+        if (!AttractMode.Active)
+        {
+            _metrics.RunStarted(Time.time, _progression.CurrentLevel);
+        }
 
         _hud.SetCurrentLevel(_progression.CurrentLevel);
+
+        if (AttractMode.Active)
+        {
+            EnterAttract();
+        }
+    }
+
+    /// <summary>
+    /// The board stays up with the game playing itself behind it. Both input maps are live: the
+    /// virtual gamepad drives the player through the Player map, while the human needs the UI
+    /// map to press Again.
+    /// </summary>
+    private void EnterAttract()
+    {
+        InputSystem.actions.FindActionMap("Player").Enable();
+        InputSystem.actions.FindActionMap("UI").Enable();
+
+        _hud.ShowAttract(AttractMode.JustPosted);
     }
 
     // GameEvents is static, so subscriptions outlive the scene. "Try Again" reloads
@@ -114,6 +141,7 @@ public class BattleSceneManager : MonoBehaviour
         GameEvents.XpEarned += OnXpEarned;
         GameEvents.TryAgain += OnTryAgain;
         GameEvents.Quit += OnQuit;
+        GameEvents.ScoreSubmitted += OnScoreSubmitted;
     }
 
     private void OnDisable()
@@ -124,6 +152,7 @@ public class BattleSceneManager : MonoBehaviour
         GameEvents.XpEarned -= OnXpEarned;
         GameEvents.TryAgain -= OnTryAgain;
         GameEvents.Quit -= OnQuit;
+        GameEvents.ScoreSubmitted -= OnScoreSubmitted;
     }
 
     private void OnPickupGrabbed(PickupCollected pickup)
@@ -152,14 +181,43 @@ public class BattleSceneManager : MonoBehaviour
 
     private void OnQuit()
     {
-        _metrics.RunEnded("quit", Time.time, _score, _progression.CurrentLevel);
+        // A demo run never started as far as metrics are concerned, so ending one would report
+        // a duration measured from a clock that was never set.
+        if (!AttractMode.Active)
+        {
+            _metrics.RunEnded("quit", Time.time, _score, _progression.CurrentLevel);
+        }
 
         Application.Quit();
     }
 
     private void OnTryAgain()
     {
-        // reload this scene
+        // A human pressed Again, so whatever happens next is a real run rather than the demo
+        // that may have been playing behind the board.
+        AttractMode.End();
+        ReloadScene();
+    }
+
+    /// <summary>
+    /// A score was recorded. The board is already up; hand the screen over to a demo run behind
+    /// it, after a beat so the player can see where they landed.
+    /// </summary>
+    private void OnScoreSubmitted(string key)
+    {
+        AttractMode.Begin(key);
+        StartCoroutine(StartAttractAfterAPause());
+    }
+
+    private System.Collections.IEnumerator StartAttractAfterAPause()
+    {
+        // Realtime: the game-over screen has the clock stopped.
+        yield return new WaitForSecondsRealtime(_attractDelay);
+        ReloadScene();
+    }
+
+    private static void ReloadScene()
+    {
         UnityEngine.SceneManagement.SceneManager.LoadScene(
             "BattleScene",
             UnityEngine.SceneManagement.LoadSceneMode.Single
@@ -214,6 +272,14 @@ public class BattleSceneManager : MonoBehaviour
 
     private void OnPlayerDeath()
     {
+        if (AttractMode.Active)
+        {
+            // The demo run ended. Start another rather than showing a game-over screen for a
+            // run nobody played; the board is already up and stays up across the reload.
+            ReloadScene();
+            return;
+        }
+
         _gameState = GameState.GameOver;
         SetPlayerInControl(false);
 
@@ -280,12 +346,15 @@ public class BattleSceneManager : MonoBehaviour
         var now = Time.time;
         var level = _progression.CurrentLevel;
 
-        _metrics.Tick(
-            now,
-            Time.unscaledDeltaTime,
-            _enemySpawner.EnemiesAlive,
-            _pickupSpawner.OnScreen
-        );
+        if (!AttractMode.Active)
+        {
+            _metrics.Tick(
+                now,
+                Time.unscaledDeltaTime,
+                _enemySpawner.EnemiesAlive,
+                _pickupSpawner.OnScreen
+            );
+        }
 
         if (!_isDeathEnemyPresent && (now - _gameStartTime > _tuning.DeathAppearanceTime))
         {

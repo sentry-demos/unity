@@ -107,6 +107,22 @@ public class ScorePoster : MonoBehaviour
     }
 
     /// <summary>
+    /// Shows the board with no entry form, for the demo run that follows a recorded score. The
+    /// form has already done its job by then, and this side of a reload there is nothing to fill
+    /// in anyway.
+    /// </summary>
+    public void ShowBoardOnly(string highlightKey)
+    {
+        if (_store == null || _board == null)
+        {
+            return;
+        }
+
+        _root.SetActive(false);
+        _ = _board.ShowAsync(_store, highlightKey);
+    }
+
+    /// <summary>
     /// Puts the panel away. The overlay is shared with the pause screen, so it has to be able
     /// to say what is not showing as well as what is.
     /// </summary>
@@ -213,9 +229,13 @@ public class ScorePoster : MonoBehaviour
         if (stored && _board != null && await _board.ShowAsync(_store, entry.Key))
         {
             // The board takes the screen over from the entry form, which has done its job.
-            // Nothing to show means the store keeps no board, so the form stays put.
             _root.SetActive(false);
             _connectionIndicator?.Unbind();
+
+            // Only once there is a board to sit behind. A store with nothing to show keeps the
+            // ordinary game-over screen, form and all, which is the remote case: its board is on
+            // the web and there is nothing here to watch a demo run behind.
+            GameEvents.RaiseScoreSubmitted(entry.Key);
         }
 
         return stored;

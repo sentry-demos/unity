@@ -8386,6 +8386,8 @@ MonoBehaviour:
   _quit: {fileID: 170557571}
   _hudManager: {fileID: 715298360}
   _reveal: {fileID: 715298361}
+  _dim: {fileID: 1155010743}
+  _attractDim: 0.5
 --- !u!114 &715298360
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8434,6 +8436,7 @@ MonoBehaviour:
   _panelRise: 45
   _scorePunch: 0.35
   _choiceStagger: 0.07
+  _dimAlpha: 1
 --- !u!114 &715298362
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12107,6 +12110,7 @@ MonoBehaviour:
   _enemySpawner: {fileID: 1361049658}
   _pickupSpawner: {fileID: 1361049656}
   _audio: {fileID: 1361049655}
+  _attractDelay: 1.6
 --- !u!4 &1361049654
 Transform:
   m_ObjectHideFlags: 0
