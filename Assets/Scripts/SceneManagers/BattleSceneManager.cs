@@ -294,6 +294,21 @@ public class BattleSceneManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Picks an upgrade without showing the choice, so a demo run still gets stronger and still
+    /// looks like a run worth watching.
+    /// </summary>
+    private static void TakeUpgradeUnattended()
+    {
+        var paths = UpgradeManager.Instance.GetRandomUpgradePaths(1);
+        if (paths == null || paths.Count == 0)
+        {
+            return;
+        }
+
+        UpgradeManager.Instance.LevelUpUpgradePath(paths[0]);
+    }
+
     private void SetScore(int score)
     {
         _score = score;
@@ -422,7 +437,16 @@ public class BattleSceneManager : MonoBehaviour
             // reset xp bar to 0 after leveling up
             _hud.SetXp(0);
 
-            _hud.ShowLevelUp();
+            if (AttractMode.Active)
+            {
+                // A demo run has nobody to ask. Offering the choice would put a panel over the
+                // leaderboard and stop the clock on the run the board is sitting in front of.
+                TakeUpgradeUnattended();
+            }
+            else
+            {
+                _hud.ShowLevelUp();
+            }
         }
     }
 }

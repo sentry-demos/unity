@@ -65,7 +65,7 @@ public class GameOverReveal : MonoBehaviour
     [SerializeField] private float _choiceStagger = 0.07f;
 
     [Tooltip("How dark the backdrop gets. Attract mode uses a lighter one so the demo run shows")]
-    [SerializeField] private float _dimAlpha = 0.85f;
+    [SerializeField] private float _dimAlpha = 0.55f;
 
     private Sequence _sequence;
     private Vector3 _panelHome;

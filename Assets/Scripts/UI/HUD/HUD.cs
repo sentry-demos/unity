@@ -62,7 +62,7 @@ public class HUD : MonoBehaviour
     [SerializeField] private Image _dim;
 
     [Range(0f, 1f)]
-    [SerializeField] private float _attractDim = 0.5f;
+    [SerializeField] private float _attractDim = 0.25f;
 
     private int _lastScore;
 
