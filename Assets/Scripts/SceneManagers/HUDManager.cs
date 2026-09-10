@@ -1,8 +1,6 @@
 using DG.Tweening;
-using TMPro;
 using UI;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -15,13 +13,15 @@ namespace SceneManagers
 
         [SerializeField] private GameObject tryAgainButton;
         [SerializeField] private GameObject quitButton;
-        [SerializeField] private ScorePoster _scorePoster;
+
+        // Wired straight from the scene. These used to be read back off ScorePoster, which
+        // meant the panel had to expose its own widgets for someone else to drive.
+        [SerializeField] private NameEntryField _nameEntry;
+        [SerializeField] private Button _submitButton;
 
         private Highlighter _tryAgainHighlighter;
         private Highlighter _quitHighlighter;
         private Highlighter _submitHighlighter;
-        private TMP_InputField _nameField;
-        private Button _submitButton;
 
         // DOTween animation for the name field. Driving the highlight through
         // OnPointerEnter(null) on a TMP_InputField crashes on Switch (NintendoSDK TMP
@@ -63,11 +63,13 @@ namespace SceneManagers
             _tryAgainHighlighter = tryAgainButton.GetComponent<Highlighter>();
             _quitHighlighter = quitButton.GetComponent<Highlighter>();
 
-            if (_scorePoster != null)
+            if (_nameEntry != null)
             {
-                _nameField = _scorePoster.NameField;
-                _submitButton = _scorePoster.SubmitButton;
-                _scorePoster.OnVirtualKeyboardClosedWithText += OnVirtualKeyboardClosedWithText;
+                _nameEntry.VirtualKeyboardClosedWithText += OnVirtualKeyboardClosedWithText;
+            }
+
+            if (_submitButton != null)
+            {
                 // Reuse the navigation buttons' highlight color for the direct tween.
                 _submitHighlightColor = tryAgainButton.GetComponent<Button>().colors.highlightedColor;
                 _submitGraphic = _submitButton.targetGraphic != null
@@ -86,9 +88,9 @@ namespace SceneManagers
             _navigateAction.performed -= OnNavigatePerformed;
             _submitAction.performed -= OnSubmitPerformed;
 
-            if (_scorePoster != null)
+            if (_nameEntry != null)
             {
-                _scorePoster.OnVirtualKeyboardClosedWithText -= OnVirtualKeyboardClosedWithText;
+                _nameEntry.VirtualKeyboardClosedWithText -= OnVirtualKeyboardClosedWithText;
             }
 
             _nameFieldTween?.Kill();
@@ -111,7 +113,7 @@ namespace SceneManagers
                 {
                     // While actively typing, only Enter should submit - Space and other
                     // Submit-bound keys must remain typeable characters in the field.
-                    if (_nameField.isFocused && context.control.device is Keyboard kb
+                    if (_nameEntry.IsTyping && context.control.device is Keyboard kb
                         && context.control != kb.enterKey && context.control != kb.numpadEnterKey)
                     {
                         return;
@@ -126,7 +128,7 @@ namespace SceneManagers
                 // No text yet - (re-)activate the input field / open the on-screen keyboard.
                 // Avoid calling Select() before ActivateInputField - on Switch, Select()
                 // triggers TMP's OnSelect internally, opening two keyboard instances at once.
-                _nameField.ActivateInputField();
+                _nameEntry.Focus();
                 return;
             }
 
@@ -163,7 +165,7 @@ namespace SceneManagers
                 // While the field is actively focused, suppress keyboard-driven navigation
                 // entirely (WASD keys like S must not trigger Navigate while typing).
                 // Gamepad/d-pad input is still allowed downward to leave the field in one press.
-                if (_nameField.isFocused && (context.control.device is Keyboard || direction.y >= 0))
+                if (_nameEntry.IsTyping && (context.control.device is Keyboard || direction.y >= 0))
                 {
                     return;
                 }
@@ -222,7 +224,7 @@ namespace SceneManagers
                 {
                     SetHighlightedButton(_submitHighlighter);
                 }
-                else if (_nameField != null && _nameField.gameObject.activeInHierarchy && _nameField.interactable)
+                else if (_nameEntry != null && _nameEntry.CanEdit)
                 {
                     ClearHighlightedButtonInternal();
                     FocusNameField();
@@ -271,17 +273,17 @@ namespace SceneManagers
 
         public void FocusNameField()
         {
-            if (_nameField == null || !_nameField.gameObject.activeInHierarchy || !_nameField.interactable)
+            if (_nameEntry == null || !_nameEntry.CanEdit)
             {
                 return;
             }
             _nameFieldFocused = true;
             // Activate so the player can type immediately (opens the on-screen keyboard on
             // touch platforms; focuses the field for physical keyboard input on PC).
-            _nameField.ActivateInputField();
+            _nameEntry.Focus();
             // Animate directly via DOTween - see the field comment for why not OnPointerEnter.
             _nameFieldTween?.Kill();
-            _nameFieldTween = _nameField.transform
+            _nameFieldTween = _nameEntry.transform
                 .DOScale(1.5f, 0.1f)
                 .SetLoops(2, LoopType.Yoyo)
                 .SetEase(Ease.InSine)
@@ -298,13 +300,10 @@ namespace SceneManagers
             _nameFieldFocused = false;
             _nameFieldTween?.Kill();
             _nameFieldTween = null;
-            if (_nameField != null)
+            if (_nameEntry != null)
             {
-                _nameField.transform.localScale = Vector3.one;
-                _nameField.DeactivateInputField();
-                // Clear the EventSystem selection so the in-flight Submit event has nowhere
-                // to land after the input field is deactivated.
-                EventSystem.current?.SetSelectedGameObject(null);
+                _nameEntry.transform.localScale = Vector3.one;
+                _nameEntry.Blur();
             }
         }
 

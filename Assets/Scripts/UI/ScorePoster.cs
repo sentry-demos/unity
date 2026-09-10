@@ -1,28 +1,27 @@
 using System;
-#if UNITY_STANDALONE_WIN
-using System.Runtime.InteropServices;
-#endif
 using System.Threading.Tasks;
 using Sentry.Unity;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// The score entry panel on the game-over screen.
+/// </summary>
+/// <remarks>
+/// A presenter, and nothing more: it reveals the panel, keeps the submit button in step with
+/// what has been typed, and reports the outcome on that button. How a score is kept belongs to
+/// <see cref="IScoreStore"/>, and how a name is typed belongs to <see cref="NameEntryField"/>.
+/// It is revealed by <see cref="HUD"/> and navigated by <c>HUDManager</c>, the same as every
+/// other part of this screen.
+/// </remarks>
 public class ScorePoster : MonoBehaviour
 {
     [SerializeField] private GameObject _root;
-    [SerializeField] private TMP_InputField _nameField;
+    [SerializeField] private NameEntryField _nameEntry;
     [SerializeField] private Button _submitButton;
-    [SerializeField] private BattleSceneManager _gameManager;
 
     private TextMeshProUGUI _buttonText;
-
-    // For HUDManager, which drives controller navigation across the game-over screen.
-    public TMP_InputField NameField => _nameField;
-    public Button SubmitButton => _submitButton;
-
-    /// <summary>Raised when the on-screen keyboard closes and the name field has text.</summary>
-    public event Action OnVirtualKeyboardClosedWithText;
 
     /// <summary>Where the score goes. Null when this mode keeps no scores at all.</summary>
     private IScoreStore _store;
@@ -30,20 +29,8 @@ public class ScorePoster : MonoBehaviour
     private bool _isUploading;
     private bool _uploadSucceeded;
 
-    private TouchScreenKeyboard _keyboard;
-    private bool _keyboardWasActive;
-    // TMP_InputField reverts to its original text when the user cancels (ESC / keyboard
-    // dismissed), which threw away a typed name. Kept here to restore it.
-    private string _savedName = "";
-
-#if UNITY_STANDALONE_WIN
-    // Windows handhelds (e.g. ROG Ally) report no touch keyboard support, so the WinRT
-    // gamepad keyboard is driven explicitly through this helper. The DLL is optional;
-    // every call is wrapped so its absence just means no on-screen keyboard.
-    [DllImport("HandheldHelper")] private static extern bool ShowVirtualKeyboard();
-    [DllImport("HandheldHelper")] private static extern bool HideVirtualKeyboard();
-    [DllImport("HandheldHelper")] private static extern bool IsDeviceHandheld();
-#endif
+    // Handed in by the HUD at reveal time, which already tracks it for the game-over display.
+    private int _finalScore;
 
     private void Awake()
     {
@@ -54,36 +41,20 @@ public class ScorePoster : MonoBehaviour
 
         // Nothing to post until a name is typed.
         _submitButton.interactable = false;
-        _nameField.onValueChanged.AddListener(OnNameValueChanged);
-        _nameField.onEndEdit.AddListener(OnNameEndEdit);
 
-        // Keep the Unity input field visible next to the native keyboard on platforms
-        // that show one (mobile, Switch).
-        _nameField.shouldHideMobileInput = false;
+        // Safe before the field's own Awake: this only registers a delegate on the instance.
+        _nameEntry.TextChanged += OnNameChanged;
+    }
 
-        if (TouchScreenKeyboard.isSupported)
+    private void OnDestroy()
+    {
+        if (_nameEntry != null)
         {
-            // Platforms with a native on-screen keyboard (mobile, Switch) need it opened
-            // explicitly when the field is selected via controller navigation.
-            _nameField.onSelect.AddListener(OnInputFieldSelected);
+            _nameEntry.TextChanged -= OnNameChanged;
         }
-#if UNITY_STANDALONE_WIN
-        else
-        {
-            try
-            {
-                if (IsDeviceHandheld())
-                {
-                    _nameField.onSelect.AddListener(OnInputFieldSelected);
-                    _nameField.onDeselect.AddListener(OnInputFieldDeselected);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"HandheldHelper unavailable: {ex.Message}");
-            }
-        }
-#endif
+
+        _store?.Dispose();
+        _store = null;
     }
 
     private static IScoreStore CreateStore()
@@ -99,134 +70,37 @@ public class ScorePoster : MonoBehaviour
         };
     }
 
-    public void Enable()
+    /// <summary>
+    /// Reveals the panel for a finished run. Whether the backend answers is not known yet and
+    /// deliberately not waited for: the panel appears if there is somewhere to post to at all,
+    /// and connecting happens when the player actually submits.
+    /// </summary>
+    public void Enable(int finalScore)
     {
-        // Whether the backend answers is not known yet and deliberately not waited for: the
-        // panel appears if there is somewhere to post to at all, and connecting happens when
-        // the player actually submits.
         if (_store == null || !_store.CanSubmit)
         {
             return;
         }
 
+        _finalScore = finalScore;
+
+        // Before this the whole panel is inactive, so the name field has not woken up yet and
+        // anything reaching into it would be reading a component that has not run Awake.
         _root.SetActive(true);
-        _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameField.text);
+
+        _nameEntry.SetLengthLimit(_store.NameLengthLimit);
+        _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameEntry.Text);
     }
 
-    private void Update()
-    {
-        // Mirror the native on-screen keyboard's text into the input field while it is open,
-        // and detect the close so navigation can move on to Submit.
-        if (_keyboard != null && _keyboard.active)
-        {
-            _nameField.text = _keyboard.text;
-            _keyboardWasActive = true;
-        }
-        else if (_keyboardWasActive)
-        {
-            if (_keyboard != null)
-            {
-                _nameField.text = _keyboard.text;
-            }
-            _keyboardWasActive = false;
-            if (!string.IsNullOrEmpty(_nameField.text))
-            {
-                OnVirtualKeyboardClosedWithText?.Invoke();
-            }
-        }
-    }
-
-    private void OnDestroy()
-    {
-        if (_nameField != null)
-        {
-            _nameField.onSelect.RemoveListener(OnInputFieldSelected);
-            _nameField.onValueChanged.RemoveListener(OnNameValueChanged);
-            _nameField.onEndEdit.RemoveListener(OnNameEndEdit);
-#if UNITY_STANDALONE_WIN
-            _nameField.onDeselect.RemoveListener(OnInputFieldDeselected);
-#endif
-        }
-
-        _store?.Dispose();
-        _store = null;
-    }
-
-    private void OnNameValueChanged(string text)
+    private void OnNameChanged()
     {
         if (_uploadSucceeded || _isUploading)
         {
             return;
         }
-        if (!string.IsNullOrEmpty(text))
-        {
-            _savedName = text;
-        }
-        _submitButton.interactable = !string.IsNullOrEmpty(text);
-    }
 
-    private void OnNameEndEdit(string text)
-    {
-        if (_uploadSucceeded)
-        {
-            return;
-        }
-        // TMP_InputField reverts to its original text when the user cancels. If the field is
-        // now empty but a name was typed earlier, restore it.
-        if (string.IsNullOrEmpty(text) && !string.IsNullOrEmpty(_savedName))
-        {
-            _nameField.SetTextWithoutNotify(_savedName);
-            _submitButton.interactable = !_isUploading;
-        }
+        _submitButton.interactable = !string.IsNullOrEmpty(_nameEntry.Text);
     }
-
-    private void OnInputFieldSelected(string text)
-    {
-        if (TouchScreenKeyboard.isSupported)
-        {
-            _keyboard = TouchScreenKeyboard.Open(
-                _nameField.text,
-                TouchScreenKeyboardType.Default,
-                false, // autocorrection
-                false, // multiline
-                false, // secure
-                false, // alert
-                _nameField.placeholder.GetComponent<TextMeshProUGUI>().text
-            );
-        }
-#if UNITY_STANDALONE_WIN
-        else
-        {
-            // Only reachable on a Windows handheld: the listener is not added otherwise.
-            try
-            {
-                ShowVirtualKeyboard();
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"Failed to show virtual keyboard: {ex.Message}");
-            }
-        }
-#endif
-    }
-
-#if UNITY_STANDALONE_WIN
-    private void OnInputFieldDeselected(string text)
-    {
-        try
-        {
-            HideVirtualKeyboard();
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"Failed to hide virtual keyboard: {ex.Message}");
-        }
-        if (!string.IsNullOrEmpty(_nameField.text))
-        {
-            OnVirtualKeyboardClosedWithText?.Invoke();
-        }
-    }
-#endif
 
     private void OnSubmit()
     {
@@ -270,11 +144,11 @@ public class ScorePoster : MonoBehaviour
             {
                 // Lock the entry so navigation and typing can't re-submit or edit the name.
                 _submitButton.interactable = false;
-                _nameField.interactable = false;
+                _nameEntry.Lock();
             }
             else
             {
-                _submitButton.interactable = !string.IsNullOrEmpty(_nameField.text);
+                _submitButton.interactable = !string.IsNullOrEmpty(_nameEntry.Text);
             }
         }
     }
@@ -293,9 +167,9 @@ public class ScorePoster : MonoBehaviour
         var entry = new ScoreEntry
         {
             Key = Guid.NewGuid().ToString(),
-            Name = _nameField.text,
+            Name = _nameEntry.Text,
             Duration = TimeSpan.FromSeconds(Time.timeSinceLevelLoad).ToString(),
-            Score = _gameManager.GetScore(),
+            Score = _finalScore,
             Timestamp = DateTime.Now.ToString("o"),
             Platform = Application.platform.ToString()
         };

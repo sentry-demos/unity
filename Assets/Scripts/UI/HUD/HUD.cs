@@ -109,7 +109,7 @@ public class HUD : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.0f);
 
         // 3. Show the score poster
-        _scorePoster.Enable();
+        _scorePoster.Enable(_lastScore);
 
         yield return new WaitForSecondsRealtime(1.0f);
 

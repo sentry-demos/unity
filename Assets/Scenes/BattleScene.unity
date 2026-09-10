@@ -8023,7 +8023,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   tryAgainButton: {fileID: 1730555519}
   quitButton: {fileID: 170557571}
-  _scorePoster: {fileID: 1394716927}
+  _nameEntry: {fileID: 1703730792}
+  _submitButton: {fileID: 856302572}
 --- !u!1001 &719918155
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -11879,9 +11880,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _root: {fileID: 502204857}
-  _nameField: {fileID: 1703730789}
+  _nameEntry: {fileID: 1703730792}
   _submitButton: {fileID: 856302572}
-  _gameManager: {fileID: 1361049653}
 --- !u!1 &1410087878
 GameObject:
   m_ObjectHideFlags: 0
@@ -33841,6 +33841,7 @@ GameObject:
   - component: {fileID: 1703730791}
   - component: {fileID: 1703730790}
   - component: {fileID: 1703730789}
+  - component: {fileID: 1703730792}
   m_Layer: 5
   m_Name: InputName
   m_TagString: Untagged
@@ -34007,6 +34008,18 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1703730787}
   m_CullTransparentMesh: 1
+--- !u!114 &1703730792
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1703730787}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7458004b6f0a3401bb5f3e45845b75c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Sentaur.Runtime::NameEntryField
 --- !u!1 &1716837250
 GameObject:
   m_ObjectHideFlags: 0
