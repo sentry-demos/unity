@@ -14,8 +14,10 @@ using UnityEngine.InputSystem;
 /// covered by the demo master switch. See CONTRIBUTING.md.
 /// </para>
 /// <para>
-/// Runs on its own Update, so it works while playing, while paused, and on the game-over
-/// screen alike. Missing input actions simply disable the trigger.
+/// Runs on its own Update, but the directions only reach it while the Player map is the one in
+/// control -- that is, during a run rather than on a menu, where the same stick is picking a
+/// button. A demo run is excluded explicitly, being the one place both maps are live at once.
+/// Missing input actions simply disable the trigger.
 /// </para>
 /// </remarks>
 public class ForceCrashSequence : MonoBehaviour
@@ -59,6 +61,17 @@ public class ForceCrashSequence : MonoBehaviour
         // what a console build depends on.
         if (_demoConfig != null && !_demoConfig.KonamiCrash)
         {
+            return;
+        }
+
+        // A demo run keeps the Player map enabled for the virtual pad while the board in front
+        // of it has the UI map for the human, so these directions are working a menu at the same
+        // time. Two trips between Again and Quit is Left Right Left Right, which is the back half
+        // of the sequence -- entered by somebody doing nothing but picking a button, which is
+        // exactly what the timeout and the reset on a wrong direction exist to rule out.
+        if (AttractMode.Active)
+        {
+            _index = 0;
             return;
         }
 

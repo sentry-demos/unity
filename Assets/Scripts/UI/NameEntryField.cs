@@ -26,7 +26,7 @@ using UnityEngine.EventSystems;
 /// </para>
 /// </remarks>
 [RequireComponent(typeof(TMP_InputField))]
-public class NameEntryField : MonoBehaviour
+public class NameEntryField : MonoBehaviour, INameEntry
 {
     private TMP_InputField _field;
 
@@ -50,6 +50,8 @@ public class NameEntryField : MonoBehaviour
 
     /// <summary>Whether the player could type into it right now.</summary>
     public bool CanEdit => gameObject.activeInHierarchy && _field.interactable;
+
+    public Transform Transform => transform;
 
 #if UNITY_STANDALONE_WIN
     // Windows handhelds (e.g. ROG Ally) report no touch keyboard support, so the WinRT
@@ -168,6 +170,29 @@ public class NameEntryField : MonoBehaviour
     public void Lock()
     {
         _field.interactable = false;
+    }
+
+    /// <summary>
+    /// Keys reaching a focused box are letters, not navigation: W and S belong in the name.
+    /// A stick is not typing, so it still gets out, and only downwards -- up from here is the
+    /// top of the screen.
+    /// </summary>
+    public bool Navigate(Vector2Int step, bool fromKeyboard)
+    {
+        if (IsTyping && (fromKeyboard || step.y >= 0))
+        {
+            return true;
+        }
+
+        return step.y >= 0;
+    }
+
+    /// <summary>
+    /// Never. A box takes its name in one go, so confirming it is confirming the whole entry.
+    /// </summary>
+    public bool Confirm()
+    {
+        return false;
     }
 
     private void OnValueChanged(string text)

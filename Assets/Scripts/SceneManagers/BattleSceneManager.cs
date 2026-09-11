@@ -64,6 +64,15 @@ public class BattleSceneManager : MonoBehaviour
     private float _gameStartTime;
     private bool _isDeathEnemyPresent = false;
 
+    // The frame the last accepted pause press landed on. See OnPause: the same press reaches
+    // this from every action map that happens to be enabled.
+    private int _lastPauseFrame = -1;
+
+    // Pause is bound in both maps, and which of them is live depends on whether a menu is up,
+    // so both are listened to. Held rather than looked up per press.
+    private InputAction _playerPause;
+    private InputAction _uiPause;
+
     private void Awake()
     {
         _demoConfig = DemoConfiguration.Load();
@@ -86,6 +95,16 @@ public class BattleSceneManager : MonoBehaviour
         _spawnDirector = new SpawnDirector();
         _metrics = new BattleMetrics();
         _enemySpawner.Initialize(_difficulty, new WaveFormation(_tuning));
+
+        // Every connected device drives this scene. A PlayerInput component used to own these
+        // actions, and such a component narrows the asset to the devices of the one control
+        // scheme it paired -- a set that comes back empty after a scene reload and leaves the
+        // game deaf to the pad and the keyboard alike. Nothing here wants that: a cabinet has a
+        // pad, a desk has a keyboard, and both should work without either claiming the asset.
+        InputSystem.actions.devices = null;
+
+        _playerPause = InputSystem.actions.FindActionMap("Player").FindAction("Pause");
+        _uiPause = InputSystem.actions.FindActionMap("UI").FindAction("Pause");
 
         InputSystem.actions.FindActionMap("Player").Enable();
         InputSystem.actions.FindActionMap("UI").Disable();
@@ -142,6 +161,9 @@ public class BattleSceneManager : MonoBehaviour
         GameEvents.TryAgain += OnTryAgain;
         GameEvents.Quit += OnQuit;
         GameEvents.ScoreSubmitted += OnScoreSubmitted;
+
+        _playerPause.performed += OnPause;
+        _uiPause.performed += OnPause;
     }
 
     private void OnDisable()
@@ -153,6 +175,9 @@ public class BattleSceneManager : MonoBehaviour
         GameEvents.TryAgain -= OnTryAgain;
         GameEvents.Quit -= OnQuit;
         GameEvents.ScoreSubmitted -= OnScoreSubmitted;
+
+        _playerPause.performed -= OnPause;
+        _uiPause.performed -= OnPause;
     }
 
     private void OnPickupGrabbed(PickupCollected pickup)
@@ -324,18 +349,33 @@ public class BattleSceneManager : MonoBehaviour
     // both once Awake has handed them over.
     public int GetCurrentLevel() => _progression.CurrentLevel;
 
-    // PlayerInput wires its UnityEvents to started, performed *and* canceled, so this runs
-    // three times per press unless it filters. That matters here because pausing disables the
-    // Player map, which cancels the very action being handled and would toggle straight back.
-    public void OnPause(InputAction.CallbackContext context)
+    // Only 'performed' is subscribed, which matters because pausing disables the Player map:
+    // that cancels the very action being handled, and a handler that also took 'canceled' would
+    // toggle the game straight back.
+    private void OnPause(InputAction.CallbackContext context)
     {
-        if (!context.performed)
+        // Pause is bound in both the Player and the UI map and both are listened to, so one
+        // press arrives twice wherever both maps are enabled -- which is the attract board.
+        // Taking only the first leaves the toggle to the press rather than to how many maps
+        // happen to be live.
+        if (_lastPauseFrame == Time.frameCount)
         {
             return;
         }
 
+        _lastPauseFrame = Time.frameCount;
+
         // Don't allow pausing if the level up UI is active (it already pauses the game)
         if (_hud.IsLevelUpOpen)
+        {
+            return;
+        }
+
+        // A demo run is nobody's game to pause, and the board it plays behind is the same
+        // overlay a pause screen would take over: pausing replaces the board with PAUSED, and
+        // unpausing switches the overlay off entirely, leaving the attract loop with no menu at
+        // all until the demo player next dies. The board already offers Again and Quit.
+        if (AttractMode.Active)
         {
             return;
         }

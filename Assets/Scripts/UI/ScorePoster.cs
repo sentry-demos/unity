@@ -10,15 +10,20 @@ using UnityEngine.UI;
 /// </summary>
 /// <remarks>
 /// A presenter, and nothing more: it reveals the panel, keeps the submit button in step with
-/// what has been typed, and reports the outcome on that button. How a score is kept belongs to
-/// <see cref="IScoreStore"/>, and how a name is typed belongs to <see cref="NameEntryField"/>.
-/// It is revealed by <see cref="HUD"/> and navigated by <c>HUDManager</c>, the same as every
-/// other part of this screen.
+/// what has been entered, and reports the outcome on that button. How a score is kept belongs
+/// to <see cref="IScoreStore"/>, and how a name is entered to <see cref="INameEntry"/> -- of
+/// which the store picks one, through <see cref="ChooseEntry"/>. It is revealed by
+/// <see cref="HUD"/> and navigated by <c>HUDManager</c>, the same as every other part of this
+/// screen.
 /// </remarks>
 public class ScorePoster : MonoBehaviour
 {
     [SerializeField] private GameObject _root;
     [SerializeField] private NameEntryField _nameEntry;
+
+    [Tooltip("Optional: the letter picker, for machines with no keyboard to type a name on")]
+    [SerializeField] private ArcadeNameEntry _arcadeEntry;
+
     [SerializeField] private Button _submitButton;
 
     [Tooltip("Optional: the light saying whether the score has anywhere to go")]
@@ -31,6 +36,9 @@ public class ScorePoster : MonoBehaviour
 
     /// <summary>Where the score goes. Null when this mode keeps no scores at all.</summary>
     private IScoreStore _store;
+
+    /// <summary>Which of the two ways in the player is being offered. Settled at reveal.</summary>
+    private INameEntry _entry;
 
     private bool _isUploading;
     private bool _uploadSucceeded;
@@ -48,8 +56,16 @@ public class ScorePoster : MonoBehaviour
         // Nothing to post until a name is typed.
         _submitButton.interactable = false;
 
-        // Safe before the field's own Awake: this only registers a delegate on the instance.
+        // Safe before either one's own Awake: this only registers a delegate on the instance.
+        // Both are listened to because which one is used is not known until the panel is
+        // revealed, and the one that is not used never raises it.
         _nameEntry.TextChanged += OnNameChanged;
+        _entry = _nameEntry;
+
+        if (_arcadeEntry != null)
+        {
+            _arcadeEntry.TextChanged += OnNameChanged;
+        }
     }
 
     private void OnDestroy()
@@ -57,6 +73,11 @@ public class ScorePoster : MonoBehaviour
         if (_nameEntry != null)
         {
             _nameEntry.TextChanged -= OnNameChanged;
+        }
+
+        if (_arcadeEntry != null)
+        {
+            _arcadeEntry.TextChanged -= OnNameChanged;
         }
 
         _store?.Dispose();
@@ -91,12 +112,21 @@ public class ScorePoster : MonoBehaviour
 
         _finalScore = finalScore;
 
-        // Before this the whole panel is inactive, so the name field has not woken up yet and
-        // anything reaching into it would be reading a component that has not run Awake.
+        // Before this the whole panel is inactive, so neither name entry has woken up yet and
+        // anything reaching into one would be reading a component that has not run Awake. Both
+        // are active in the scene for that reason, and the unused one is switched off below --
+        // after its Awake, so it can still answer for itself.
         _root.SetActive(true);
 
-        _nameEntry.SetLengthLimit(_store.NameLengthLimit);
-        _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_nameEntry.Text);
+        _entry = ChooseEntry();
+        if (_arcadeEntry != null)
+        {
+            _arcadeEntry.gameObject.SetActive(ReferenceEquals(_entry, _arcadeEntry));
+        }
+        _nameEntry.gameObject.SetActive(ReferenceEquals(_entry, _nameEntry));
+
+        _entry.SetLengthLimit(_store.NameLengthLimit);
+        _submitButton.interactable = !_uploadSucceeded && !string.IsNullOrEmpty(_entry.Text);
 
         // Starts reaching for the backend now, so the light has answered by the time a name is
         // typed. A store with nothing to reach hides it instead.
@@ -141,6 +171,21 @@ public class ScorePoster : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Which way this board asks for a name. The store says; this only obeys.
+    /// </summary>
+    /// <remarks>
+    /// Local scores are an arcade board and take initials, which the picker enters with nothing
+    /// but a stick -- the only thing that works on a WebGL build or a kiosk cabinet, neither of
+    /// which has a keyboard to open or plug in. Remote scores take a full name, which has to be
+    /// typed. A scene with no picker wired falls back to the text box either way.
+    /// </remarks>
+    private INameEntry ChooseEntry()
+    {
+        var wantsInitials = _store.NameEntry == NameEntryStyle.Initials;
+        return wantsInitials && _arcadeEntry != null ? _arcadeEntry : _nameEntry;
+    }
+
     private void OnNameChanged()
     {
         if (_uploadSucceeded || _isUploading)
@@ -148,7 +193,7 @@ public class ScorePoster : MonoBehaviour
             return;
         }
 
-        _submitButton.interactable = !string.IsNullOrEmpty(_nameEntry.Text);
+        _submitButton.interactable = !string.IsNullOrEmpty(_entry.Text);
     }
 
     private void OnSubmit()
@@ -193,11 +238,11 @@ public class ScorePoster : MonoBehaviour
             {
                 // Lock the entry so navigation and typing can't re-submit or edit the name.
                 _submitButton.interactable = false;
-                _nameEntry.Lock();
+                _entry.Lock();
             }
             else
             {
-                _submitButton.interactable = !string.IsNullOrEmpty(_nameEntry.Text);
+                _submitButton.interactable = !string.IsNullOrEmpty(_entry.Text);
             }
         }
     }
@@ -216,7 +261,7 @@ public class ScorePoster : MonoBehaviour
         var entry = new ScoreEntry
         {
             Key = Guid.NewGuid().ToString(),
-            Name = _nameEntry.Text,
+            Name = _entry.Text,
             Duration = TimeSpan.FromSeconds(Time.timeSinceLevelLoad).ToString(),
             Score = _finalScore,
             Timestamp = DateTime.Now.ToString("o"),

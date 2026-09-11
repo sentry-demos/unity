@@ -54,6 +54,9 @@ public sealed class RemoteScoreStore : IScoreStore
     /// <summary>Configured is enough. Whether the backend answers is found out at submit time.</summary>
     public bool CanSubmit => !string.IsNullOrEmpty(_apiUrl);
 
+    /// <summary>The backend takes a full name, so it is typed rather than wound.</summary>
+    public NameEntryStyle NameEntry => NameEntryStyle.FullName;
+
     /// <summary>The backend takes a full name.</summary>
     public int NameLengthLimit => 0;
 

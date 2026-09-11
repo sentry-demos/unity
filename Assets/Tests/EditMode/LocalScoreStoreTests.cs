@@ -1,6 +1,9 @@
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 public class LocalScoreStoreTests
 {
@@ -160,13 +163,21 @@ public class LocalScoreStoreTests
         Submit("ABC", 10);
         File.WriteAllText(BoardPath, "{ this is not json");
 
-        // Reported rather than thrown: a corrupt board must not take the game down.
-        UnityEngine.TestTools.LogAssert.ignoreFailingMessages = true;
+        // Reported rather than thrown: a corrupt board must not take the game down. Expected
+        // rather than ignored, so that the report quietly going away fails this test too --
+        // which ignoring every failing message could not tell the difference from. The tail of
+        // the message is whatever the JSON reader called it, so only the stable half is matched.
+        var unreadable = new Regex("^The local score board could not be read: ");
+
+        LogAssert.Expect(LogType.Error, unreadable);
         Assert.IsEmpty(Top(10));
 
+        // Once more: writing the next board reads the old one first, through the same Load.
+        LogAssert.Expect(LogType.Error, unreadable);
         Submit("NEW", 20);
+
+        // And the board written over it is readable again, so this last read expects nothing.
         Assert.AreEqual(new[] { "NEW" }, Top(10).Select(e => e.Name).ToArray());
-        UnityEngine.TestTools.LogAssert.ignoreFailingMessages = false;
     }
 
     [Test]

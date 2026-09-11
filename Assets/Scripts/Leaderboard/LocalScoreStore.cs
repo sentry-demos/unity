@@ -47,6 +47,9 @@ public sealed class LocalScoreStore : IScoreStore
     /// <summary>Always. There is no session to establish and nothing to be unreachable.</summary>
     public bool CanSubmit => true;
 
+    /// <summary>Arcade rules again: three slots wound with a stick, and no keyboard wanted.</summary>
+    public NameEntryStyle NameEntry => NameEntryStyle.Initials;
+
     public int NameLengthLimit => NameLimit;
 
     /// <summary>Nothing to connect to, so the indicator stays hidden rather than showing failure.</summary>

@@ -18,6 +18,10 @@ namespace SceneManagers
         // Wired straight from the scene. These used to be read back off ScorePoster, which
         // meant the panel had to expose its own widgets for someone else to drive.
         [SerializeField] private NameEntryField _nameEntry;
+
+        [Tooltip("Optional: the letter picker, for machines with no keyboard to type a name on")]
+        [SerializeField] private ArcadeNameEntry _arcadeEntry;
+
         [SerializeField] private Button _submitButton;
 
         private Highlighter _tryAgainHighlighter;
@@ -48,6 +52,29 @@ namespace SceneManagers
 
         private GameObject _highlightedButton;
         private bool _nameFieldFocused;
+
+        /// <summary>
+        /// Whichever name entry this run is asking for. <see cref="ScorePoster"/> switches one
+        /// of the two on when it reveals the panel, from what the score store wants, so which
+        /// is live can simply be read off the scene rather than agreed on between them.
+        /// </summary>
+        /// <remarks>
+        /// Both arms go through Unity's own null check before being handed back as an interface.
+        /// Past that point the reference is a plain one, where a destroyed or never-assigned
+        /// component would read as present and throw on the first call.
+        /// </remarks>
+        private INameEntry ActiveEntry
+        {
+            get
+            {
+                if (_arcadeEntry != null && _arcadeEntry.gameObject.activeInHierarchy)
+                {
+                    return _arcadeEntry;
+                }
+
+                return _nameEntry != null ? _nameEntry : null;
+            }
+        }
 
         // Navigate is a pass-through action bound to an analog stick, so it fires on every value
         // change -- every frame while the stick is off centre, and once more on the way back to
@@ -142,6 +169,19 @@ namespace SceneManagers
 
             if (_nameFieldFocused)
             {
+                var entry = ActiveEntry;
+                if (entry == null)
+                {
+                    return;
+                }
+
+                // The picker takes a confirm per letter and only hands the press back on the
+                // last one. A text box never wants it.
+                if (entry.Confirm())
+                {
+                    return;
+                }
+
                 // With text present, Confirm fires the submit button directly - whether or not
                 // the on-screen keyboard is still open. ClearNameFieldFocus() deactivates the
                 // input field, which closes the keyboard.
@@ -149,7 +189,7 @@ namespace SceneManagers
                 {
                     // While actively typing, only Enter should submit - Space and other
                     // Submit-bound keys must remain typeable characters in the field.
-                    if (_nameEntry.IsTyping && context.control.device is Keyboard kb
+                    if (entry.IsTyping && context.control.device is Keyboard kb
                         && context.control != kb.enterKey && context.control != kb.numpadEnterKey)
                     {
                         return;
@@ -164,7 +204,7 @@ namespace SceneManagers
                 // No text yet - (re-)activate the input field / open the on-screen keyboard.
                 // Avoid calling Select() before ActivateInputField - on Switch, Select()
                 // triggers TMP's OnSelect internally, opening two keyboard instances at once.
-                _nameEntry.Focus();
+                entry.Focus();
                 return;
             }
 
@@ -235,31 +275,12 @@ namespace SceneManagers
 
             if (_nameFieldFocused)
             {
-                // While the field is actively focused, suppress keyboard-driven navigation
-                // entirely (WASD keys like S must not trigger Navigate while typing).
-                // Gamepad/d-pad input is still allowed downward to leave the field in one press.
-                if (_nameEntry.IsTyping && (context.control.device is Keyboard || direction.y >= 0))
+                // The entry decides what a step means where it is standing: a letter to wind, a
+                // key that belongs in the name, or nothing it wants. Only the last leaves.
+                var entry = ActiveEntry;
+                if (entry == null || !entry.Navigate(step, context.control.device is Keyboard))
                 {
-                    return;
-                }
-
-                // Navigate down away from the name field
-                if (direction.y < 0)
-                {
-                    ClearNameFieldFocus();
-                    if (_submitButton != null && _submitButton.interactable
-                        && _submitHighlighter != null && _submitHighlighter.isActiveAndEnabled)
-                    {
-                        SetHighlightedButton(_submitHighlighter);
-                    }
-                    else if (_tryAgainHighlighter.isActiveAndEnabled)
-                    {
-                        SetHighlightedButton(_tryAgainHighlighter);
-                    }
-                    else if (_quitHighlighter.isActiveAndEnabled)
-                    {
-                        SetHighlightedButton(_quitHighlighter);
-                    }
+                    LeaveNameField();
                 }
                 return;
             }
@@ -297,7 +318,7 @@ namespace SceneManagers
                 {
                     SetHighlightedButton(_submitHighlighter);
                 }
-                else if (_nameEntry != null && _nameEntry.CanEdit)
+                else if (ActiveEntry is { CanEdit: true })
                 {
                     ClearHighlightedButtonInternal();
                     FocusNameField();
@@ -335,6 +356,28 @@ namespace SceneManagers
             }
         }
 
+        /// <summary>
+        /// Moves the highlight off the name and onto the first button still standing below it.
+        /// </summary>
+        private void LeaveNameField()
+        {
+            ClearNameFieldFocus();
+
+            if (_submitButton != null && _submitButton.interactable
+                && _submitHighlighter != null && _submitHighlighter.isActiveAndEnabled)
+            {
+                SetHighlightedButton(_submitHighlighter);
+            }
+            else if (_tryAgainHighlighter.isActiveAndEnabled)
+            {
+                SetHighlightedButton(_tryAgainHighlighter);
+            }
+            else if (_quitHighlighter.isActiveAndEnabled)
+            {
+                SetHighlightedButton(_quitHighlighter);
+            }
+        }
+
         private void OnVirtualKeyboardClosedWithText()
         {
             if (_submitButton != null && _submitButton.interactable
@@ -351,14 +394,16 @@ namespace SceneManagers
         /// </summary>
         public void FocusNameField(bool announce = true)
         {
-            if (_nameEntry == null || !_nameEntry.CanEdit)
+            var entry = ActiveEntry;
+            if (entry == null || !entry.CanEdit)
             {
                 return;
             }
             _nameFieldFocused = true;
-            // Activate so the player can type immediately (opens the on-screen keyboard on
-            // touch platforms; focuses the field for physical keyboard input on PC).
-            _nameEntry.Focus();
+            // Activate so the player can enter a name immediately (opens the on-screen keyboard
+            // on touch platforms, focuses the field for physical keyboard input on PC, lights
+            // the first letter slot on the picker).
+            entry.Focus();
 
             if (!announce)
             {
@@ -367,7 +412,7 @@ namespace SceneManagers
 
             // Animate directly via DOTween - see the field comment for why not OnPointerEnter.
             _nameFieldTween?.Kill();
-            _nameFieldTween = _nameEntry.transform
+            _nameFieldTween = entry.Transform
                 .DOScale(_nameFieldBounce, _nameFieldBounceTime)
                 .SetLoops(2, LoopType.Yoyo)
                 .SetEase(Ease.InSine)
@@ -384,10 +429,12 @@ namespace SceneManagers
             _nameFieldFocused = false;
             _nameFieldTween?.Kill();
             _nameFieldTween = null;
-            if (_nameEntry != null)
+
+            var entry = ActiveEntry;
+            if (entry != null)
             {
-                _nameEntry.transform.localScale = Vector3.one;
-                _nameEntry.Blur();
+                entry.Transform.localScale = Vector3.one;
+                entry.Blur();
             }
         }
 
