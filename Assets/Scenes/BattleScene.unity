@@ -33639,8 +33639,6 @@ MonoBehaviour:
   _connecting: {r: 0.96, g: 0.71, b: 0.24, a: 1}
   _connected: {r: 0.29, g: 0.78, b: 0.45, a: 1}
   _failed: {r: 0.85, g: 0.34, b: 0.3, a: 1}
-  _firstRetryDelay: 1
-  _maxAttempts: 5
 --- !u!114 &1565766205
 MonoBehaviour:
   m_ObjectHideFlags: 0

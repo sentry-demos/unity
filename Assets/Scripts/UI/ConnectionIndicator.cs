@@ -10,16 +10,15 @@ using UnityEngine.UI;
 /// </summary>
 /// <remarks>
 /// <para>
-/// It retries on its own, widening the gap each time, because a connection that was down when
-/// the run started is often back by the time the run ends. Giving up leaves the light red rather
-/// than hiding it: "we tried and could not" is worth telling the player.
+/// It reaches for the backend exactly once, when the screen appears. It used to retry on its own
+/// with a widening gap, which meant a player sitting on the game-over screen kept hammering a
+/// backend that was not answering. Every attempt after the first belongs to the player: the
+/// submit button reads "Retry" once an upload has failed, and pressing it logs in afresh.
 /// </para>
 /// <para>
-/// A store with no backend hides it entirely instead of showing failure. There is nothing wrong
-/// with keeping a score on the device, so there is nothing to report.
-/// </para>
-/// <para>
-/// Waits are real-time, which matters: this screen runs at <c>Time.timeScale = 0</c>.
+/// Failure leaves the light red rather than hiding it: "we tried and could not" is worth telling
+/// the player. A store with no backend hides it entirely instead, because there is nothing wrong
+/// with keeping a score on the device, and so nothing to report.
 /// </para>
 /// </remarks>
 public class ConnectionIndicator : MonoBehaviour
@@ -32,19 +31,12 @@ public class ConnectionIndicator : MonoBehaviour
     [SerializeField] private Color _connected = new Color(0.29f, 0.78f, 0.45f);
     [SerializeField] private Color _failed = new Color(0.85f, 0.34f, 0.30f);
 
-    [Header("Retry")]
-    [Tooltip("Seconds before the first retry. Each further wait is twice the last")]
-    [SerializeField] private float _firstRetryDelay = 1f;
-
-    [Tooltip("How many attempts before giving up and leaving the light red")]
-    [SerializeField] private int _maxAttempts = 5;
-
     private IScoreStore _store;
     private CancellationTokenSource _cancellation;
 
     /// <summary>
-    /// Starts reporting on a store, and starts trying to reach it. Safe to call again; the
-    /// previous attempt is abandoned first.
+    /// Starts reporting on a store, and makes the one attempt to reach it. Safe to call again;
+    /// the previous attempt is abandoned first.
     /// </summary>
     public void Bind(IScoreStore store)
     {
@@ -63,7 +55,7 @@ public class ConnectionIndicator : MonoBehaviour
         Render(_store.Connection);
 
         _cancellation = new CancellationTokenSource();
-        _ = RetryUntilConnectedAsync(_cancellation.Token);
+        _ = ConnectAsync(_cancellation.Token);
     }
 
     /// <summary>Stops reporting and abandons any attempt in flight.</summary>
@@ -84,52 +76,29 @@ public class ConnectionIndicator : MonoBehaviour
 
     private void OnDestroy()
     {
-        // "Try Again" reloads the scene, and the store is disposed with it. A retry still
-        // sleeping here would wake up holding a disposed client.
+        // "Try Again" reloads the scene, and the store is disposed with it. An attempt still in
+        // flight here would come back holding a disposed client.
         Unbind();
     }
 
-    private async Task RetryUntilConnectedAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// One attempt, so the light has an answer by the time a name is typed. Whether to try again
+    /// is the player's call, made on the submit button.
+    /// </summary>
+    private async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        var wait = _firstRetryDelay;
-
-        for (var attempt = 1; attempt <= _maxAttempts; attempt++)
+        try
         {
-            try
-            {
-                await _store.TryConnectAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                // The store reports its own failures; this is only for something unforeseen.
-                Debug.LogWarning($"Connection attempt {attempt} failed: {ex.Message}");
-            }
-
-            if (cancellationToken.IsCancellationRequested || _store == null)
-            {
-                return;
-            }
-
-            if (_store.Connection == ConnectionState.Connected || attempt == _maxAttempts)
-            {
-                return;
-            }
-
-            try
-            {
-                // Real time on purpose: the game-over screen has the clock stopped.
-                await Task.Delay(TimeSpan.FromSeconds(wait), cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-
-            wait *= 2f;
+            await _store.TryConnectAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // The screen went away mid-attempt. Nothing left to draw on.
+        }
+        catch (Exception ex)
+        {
+            // The store reports its own failures; this is only for something unforeseen.
+            Debug.LogWarning($"Connection attempt failed: {ex.Message}");
         }
     }
 
