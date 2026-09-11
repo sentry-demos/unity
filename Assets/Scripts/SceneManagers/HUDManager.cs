@@ -49,9 +49,21 @@ namespace SceneManagers
         private GameObject _highlightedButton;
         private bool _nameFieldFocused;
 
-        // Prevent rapid double-fire from analog sticks or composite bindings.
-        private float _lastNavTime;
-        private const float NavCooldown = 0.2f;
+        // Navigate is a pass-through action bound to an analog stick, so it fires on every value
+        // change -- every frame while the stick is off centre, and once more on the way back to
+        // it. What arrives is the raw vector, which carries whatever the other axis happens to
+        // be reading: a stick pushed left reports a little up or down along with it.
+        //
+        // Both facts are handled by quantising: the vector becomes one of four steps, and a step
+        // only counts when it differs from the last one. This used to be a flat 0.2s cooldown,
+        // armed before the direction was read, so letting go of the stick started a fresh dead
+        // window and swallowed the next press. Same treatment as the level-up screen.
+        private Vector2Int _navStep;
+
+        // Entering a step takes a firm push; leaving it takes a fair return towards centre, so a
+        // stick resting near the line does not chatter between two buttons.
+        private const float NavEnter = 0.5f;
+        private const float NavRelease = 0.35f;
 
         // Graphic.DOColor lives in DOTween's UI module, which compiles into
         // Assembly-CSharp-firstpass and is not visible from this asmdef assembly - only the
@@ -169,20 +181,57 @@ namespace SceneManagers
             }
         }
 
+        /// <summary>
+        /// The raw stick vector as one of four steps, or zero for centred. The dominant axis
+        /// wins, so a left push carrying a little upward bleed is a left and not an up.
+        /// </summary>
+        private Vector2Int ReadNavStep(Vector2 raw)
+        {
+            var horizontal = Mathf.Abs(raw.x) >= Mathf.Abs(raw.y);
+            var axis = horizontal ? raw.x : raw.y;
+
+            // Already standing in a step on this axis, so it takes less to stay in it.
+            var held = horizontal ? _navStep.x != 0 : _navStep.y != 0;
+
+            if (Mathf.Abs(axis) < (held ? NavRelease : NavEnter))
+            {
+                return Vector2Int.zero;
+            }
+
+            var step = axis > 0 ? 1 : -1;
+            return horizontal ? new Vector2Int(step, 0) : new Vector2Int(0, step);
+        }
+
         private void OnNavigatePerformed(InputAction.CallbackContext context)
         {
-            if (!gameObject.activeSelf || IsDemoInput(context))
+            if (!gameObject.activeSelf)
+            {
+                // Nobody is listening, so where the stick happens to be resting must not carry
+                // over as a step already taken the next time this screen comes up.
+                _navStep = Vector2Int.zero;
+                return;
+            }
+
+            if (IsDemoInput(context))
             {
                 return;
             }
 
-            if (Time.realtimeSinceStartup - _lastNavTime < NavCooldown)
+            var step = ReadNavStep(context.ReadValue<Vector2>());
+            if (step == _navStep)
             {
                 return;
             }
-            _lastNavTime = Time.realtimeSinceStartup;
 
-            var direction = context.ReadValue<Vector2>();
+            _navStep = step;
+
+            // Back to centre. Nothing to move, but the next push now counts as a fresh one.
+            if (step == Vector2Int.zero)
+            {
+                return;
+            }
+
+            var direction = (Vector2)step;
 
             if (_nameFieldFocused)
             {

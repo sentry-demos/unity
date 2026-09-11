@@ -22,6 +22,9 @@ namespace SceneManagers
 
         private GameObject _highlightedButton;
 
+        // How far sideways counts as a sideways push. Matches the game-over screen.
+        private const float NavThreshold = 0.5f;
+
         private void Awake()
         {
             _demoConfig = DemoConfiguration.Load();
@@ -59,21 +62,29 @@ namespace SceneManagers
                 return;
             }
 
+            // A firm push, not any push. The raw stick vector carries whatever the other axis
+            // reads, so an upward shove with a little sideways bleed used to move the highlight.
             var direction = _navigateAction.ReadValue<Vector2>();
-            if (direction.x < 0)
+            if (Mathf.Abs(direction.x) < NavThreshold || Mathf.Abs(direction.x) < Mathf.Abs(direction.y))
             {
-                SetHighlightedButton(_startHighlighter);
+                return;
             }
-            else if (direction.x > 0)
-            {
-                SetHighlightedButton(_quitHighlighter);
-            }
+
+            SetHighlightedButton(direction.x < 0 ? _startHighlighter : _quitHighlighter);
         }
 
         public void OnSubmit() => _highlightedButton?.GetComponent<Button>().onClick.Invoke();
 
         public void SetHighlightedButton(Highlighter highlighted)
         {
+            // Navigate fires every frame the stick is off centre, and this is reached on each
+            // one. Landing on the button that is already lit has to be nothing at all, or the
+            // bounce restarts every frame and never gets far enough to be seen.
+            if (_highlightedButton == highlighted.gameObject)
+            {
+                return;
+            }
+
             _startHighlighter.Highlight(false);
             _quitHighlighter.Highlight(false);
 
